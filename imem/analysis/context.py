@@ -137,15 +137,17 @@ def plot_ctx_net_analysis(t, recalled_ctx, ctx, ctx_test_env, fig=None):
 
     subplots = gridspec.GridSpec(2, 2, width_ratios=(1., 2.))
     ax1 = fig.add_subplot(subplots[0, 0])
+    ax1.set_title("(a) Norm")
     ax2 = fig.add_subplot(subplots[1, 0], sharex=ax1)
+    ax2.set_title("(b) Effective context drift")
+    ax3 = fig.add_subplot(subplots[:, 1], sharex=ax1)
+    ax3.set_title("(c) Context similarity decay")
 
     plot_ctx_norm(t, ctx, ax=ax1)
     plot_effective_beta(t, recalled_ctx, ctx, ctx_test_env, ax=ax2)
-    _, ax3_cbar = plot_similarity_decay(
-        t, ctx, ctx_test_env, fig=fig, subplot=subplots[:, 1])
+    plot_similarity_decay(t, ctx, ctx_test_env, ax=ax3)
 
     sns.despine(fig)
-    sns.despine(ax=ax3_cbar, left=True, right=False)
     subplots.tight_layout(fig)
 
 def plot_ctx_norm(t, ctx, ax=None):
@@ -164,7 +166,7 @@ def plot_ctx_norm(t, ctx, ax=None):
         ax = plt.gca()
     ax.plot(t, np.linalg.norm(ctx, axis=1))
     ax.axhline(y=1., c='k', ls='--')
-    ax.set_ylabel("Norm of context vector")
+    ax.set_ylabel("$||\mathbf{c}||$")
     ax.set_yticks([0, 1])
 
 
@@ -194,13 +196,13 @@ def plot_effective_beta(t, recalled_ctx, ctx, ctx_test_env, ax=None):
         ax.plot(t[sel], y[sel])
 
     ax.axhline(y=ctx_test_env.beta, c='k', ls='--')
-    ax.set_xlabel("Time [s]")
-    ax.set_ylabel(r"Effective $\beta$")
+    ax.set_xlabel(r"Time $t/\mathrm{s}$")
+    ax.set_ylabel(r"$\beta'$")
     ax.set_yticks([0, ctx_test_env.beta, 1])
 
 
 def plot_similarity_decay(
-        t, ctx, ctx_test_env, max_diff=0.2, fig=None, subplot=None):
+        t, ctx, ctx_test_env, max_diff=0.2, ax=None):
     """Plot the similarity decay over time.
 
     Parameters
@@ -213,25 +215,13 @@ def plot_similarity_decay(
         Context test environment.
     max_diff : float
         Maximum difference to target beta to highlight in plot.
-    fig : Figure
-        Figure to plot on.
-    subplot : suplot spec
-        Subplot to plot on.
-
-    Returns
-    -------
-    (ax, ax_cbar)
+    ax : Axes
+        Axes to plot on.
     """
-    if fig is None:
-        fig = plt.gcf()
-    if subplot is None:
-        subplot = fig.add_subplot(1, 1, 1)
+    if ax is None:
+        ax = plt.gca()
 
     with sns.color_palette("GnBu_d", ctx_test_env.n):
-        gs = gridspec.GridSpecFromSubplotSpec(
-            1, 2, subplot, width_ratios=(15., 1.))
-        ax = fig.add_subplot(gs[0])
-
         out_normed = ctx / np.linalg.norm(ctx, axis=1)[:, None]
         for i in range(1, ctx_test_env.n):
             start = int((i + .7) / ctx_test_env.dt)
@@ -240,26 +230,15 @@ def plot_similarity_decay(
             y = np.dot(out_normed, target)
             ax.plot(t - i, y, c=sns.color_palette()[-i])
 
-        beta_diffs = np.linspace(0, max_diff, 100)
-        cmap = sns.color_palette('Oranges', len(beta_diffs))
         decay = lambda x: np.sqrt(1. - x**2)**np.floor(t)
-        for x, c in zip(reversed(beta_diffs), cmap):
-            ax.fill_between(t, decay(ctx_test_env.beta - x),
-                            decay(ctx_test_env.beta + x), color=c)
+        ax.plot(t, decay(ctx_test_env.beta), color='gray')
 
         ax.set_xlim(left=0.)
         ax.set_ylim(0., 1.)
-        ax.set_xlabel("Time [s]")
-        ax.set_ylabel("Context similarity decay")
+        ax.set_xlabel(r"Time $t/\mathrm{s}$")
+        ax.set_ylabel(r"$\mathbf{c}_i \cdot \mathbf{c}(t)$")
 
-        ax_cbar = fig.add_subplot(gs[1])
-        cbar = ListedColormap(cmap + cmap[:1:-1])
-        ColorbarBase(ax_cbar, cmap=cbar,
-                     norm=Normalize(ctx_test_env.beta - max_diff,
-                                    ctx_test_env.beta + max_diff))
-        ax_cbar.set_ylabel(r"$\beta$")
-
-    return ax, ax_cbar
+    return ax
 
 def band_average(mat):
     assert mat.ndim == 2 and mat.shape[0] == mat.shape[1]
