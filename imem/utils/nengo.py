@@ -2,7 +2,7 @@ import nengo
 import numpy as np
 
 
-def inhibit_net(pre, post, strength=1., **kwargs):
+def inhibit_net(pre, post, strength=2., **kwargs):
     """Makes an inhibitory connection to all ensembles of a network.
 
     Uses a lowpass synapse with a time constant of 0.0085s by default.
