@@ -1,0 +1,51 @@
+\chapter{Association Matrix Learning}
+
+The TCM requires two association matrices, $\mat M_\ped{TF}$ and $\mat M_\ped{FT}$, to be updated.
+To translate this into neurons an appropriate learning rule, the association matrix learning rule (AML), has to be derived.
+The TCM gives the update of such an association matrix as
+\begin{eqnarray}
+    \mat M_{i+1} =& \mat M_i + \Delta \mat M_i \\
+    \Delta \mat M_i =& \vc v_i \vc u_i\Tr
+\end{eqnarray}
+for adding an association from $\vc a$ to $\vc b$.
+The association matrix after $n$ updates can be expressed as
+\begin{equation}
+    \mat M_n = M_0 + \sum_{i=1}^{n} \Delta \mat M_i = M_0 + \sum_{i=1}^n \vc v_i \vc u_i\Tr \text{.}
+\end{equation}
+This allows us to express the neural connection weights after learning $n$ associations as
+\begin{equation}
+    \mat W = \mat E \mat M_n \mat D = \mat E \mat M_0 \mat D + E \sum_{i=1}^n \mat \vc v_i \vc u_i\Tr \mat D
+\end{equation}
+where $\mat E$ is the post-synaptic encoder matrix and $\mat D$ are the pre-synaptic decoders of the identity function.
+This equation gives us some important information on how the learning of such association matrices can be implemented.
+First, preexisting weights can be implemented as a transform on a normal neural connection that is kept constant.
+Second, all the weight changes can be collapsed into decoder changes.
+Thus, we need the AML to implement the decoder change given by
+\begin{equation}
+    \Delta \tilde{\mat D} = \vc v_i \vc u_i\Tr \mat D
+\end{equation}
+where $\tilde{\mat D}$ is the matrix of learned decoders.
+
+To implement this within a neural network, the discrete equation has to be converted into continuous form:
+\begin{equation}
+    \od{\tilde{\mat D}}{t} = \eta \vc v(t) \vc u(t)\Tr \mat D
+\end{equation}
+with learning rate $\eta$.
+This equation can be directly implemented with the NEF and thus realized with spiking neurons.
+That alone, however, does not ensure the biological plausibility as any mathematical formulations of synaptic weight changes could be implemented with the NEF\@.
+To get a better sense of the biological plausibility it is useful to obtain a formulation of the learning rule in terms of neural activities by replacing the decoded values, yielding
+\begin{eqnarray}
+    \od{\tilde{\mat D}}{t} =& \eta (D_v a_v(t)) (D a_u(t))\Tr D \\
+    =& \eta D_v (a_v(t) a_u\Tr(t)) D\Tr D \text{.}
+\end{eqnarray}
+Here, $D\Tr D$ gives a correlation matrix of neurons representing the same dimension and $a_v(t) a_u\Tr(t)$ can be interpreted as a \emph{modulatory Hebbian term}.
+Unlike a standard Hebbian term it does not connect neurons that fire together, but the combined firing of two neurons modulates the connection of one of these neurons to a third population (see Fig.~TODO).
+If the population $u$ projects to is used as the $v$ input population, this rule will become truly Hebbian and neurons that fire together will connect with respect to the weighting introduced by $D_v$ and $D\Tr D$.
+Note that in contrast to many other learning rules AML does not produce destructive interference due to the correlation matrix term.
+
+Note that the AML, like many other Hebbian-style learning rules, allows weights to grow without bound.
+By introducing a factor of $1 - v(t)\Tr \hat{v}(t)$ this can be prevented, but similar to other weight normalizations it introduces the need for each weight to have access to the global population activity and weights as $\hat{v}(t) = \tilde{\mat D} a_u(t)$.
+Such global dependencies are ofter criticized for not being biological plausible.
+As such, I decided to take a slightly different approach with an equivalent effect.
+Instead of including the dot product $v(t)\Tr \hat{v}(t)$ in the learning rule, it can be computed by another neural population and the result can be used to inhibit the population providing $v$.
+Once fully inhibited $a_v(t)$ will be all-zero and thus prevent further weight changes.
