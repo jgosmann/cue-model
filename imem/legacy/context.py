@@ -68,23 +68,23 @@ def AlternatingMemoryBuffers(d, beta, **kwargs):
             net.update_done = nengo.Ensemble(150, 1)
         net.update_done_th = nengo.Node(size_in=1)
 
-        nengo.Connection(net.bias, net.update_done, transform=-1.)
+        nengo.Connection(net.bias, net.update_done, transform=-1.1)
 
         nengo.Connection(net.input, net.new_ctx, transform=beta)
-        nengo.Connection(net.new_ctx, net.current.diff.input, synapse=None)
+        nengo.Connection(net.new_ctx, net.current.input, synapse=None)
 
         nengo.Connection(
             net.update_done, net.update_done_th, synapse=None,
             function=lambda x: x > 0)
 
         nengo.Connection(net.new_ctx, net.dot.input_a)
-        nengo.Connection(net.current.mem.output, net.dot.input_b)
+        nengo.Connection(net.current.output, net.dot.input_b)
         nengo.Connection(net.dot.output, net.update_done)
         nengo.Connection(net.update_done_th, net.current.store)
 
-        nengo.Connection(net.current.mem.output, net.old.diff.input)
+        nengo.Connection(net.current.output, net.old.input)
         nengo.Connection(
-            net.old.mem.output, net.new_ctx, transform=np.sqrt(1. - (beta)**2))
+            net.old.output, net.new_ctx, transform=np.sqrt(1. - (beta)**2))
         with nengo.presets.ThresholdingEnsembles(0.):
             net.invert = nengo.Ensemble(50, 1)
         nengo.Connection(net.bias, net.invert)
@@ -93,7 +93,7 @@ def AlternatingMemoryBuffers(d, beta, **kwargs):
             transform=-3 * np.ones((net.invert.n_neurons, 1)))
         nengo.Connection(net.invert, net.old.store)
 
-        net.output = net.current.mem.output
+        net.output = net.current.output
 
     return net
 
@@ -105,9 +105,9 @@ def ThreeMemory(d, beta, **kwargs):
         net.input = nengo.Node(size_in=d)
 
         net.new_ctx = nengo.Node(size_in=d)
-        net.current = GatedMemory(d, in_tr=10, in_syn=0.1)
-        net.buf = GatedMemory(d, in_tr=10, in_syn=0.1)
-        net.old = GatedMemory(d, in_tr=10, in_syn=0.1)
+        net.current = GatedMemory(d)
+        net.buf = GatedMemory(d)
+        net.old = GatedMemory(d)
 
         nengo.Connection(net.input, net.new_ctx, transform=beta)
         nengo.Connection(
@@ -144,9 +144,9 @@ def Context4(d, beta, **kwargs):
         net.input = nengo.Node(size_in=d)
 
         net.new_ctx = nengo.Node(size_in=d)
-        net.current = GatedMemory(d, in_tr=10, in_syn=0.1)
-        net.buf = GatedMemory(d, in_tr=10, in_syn=0.1)
-        net.old = GatedMemory(d, in_tr=10, in_syn=0.1)
+        net.current = GatedMemory(d)
+        net.buf = GatedMemory(d)
+        net.old = GatedMemory(d)
 
         nengo.Connection(net.input, net.new_ctx, transform=beta)
         nengo.Connection(
@@ -195,8 +195,8 @@ def Context5(d, beta, **kwargs):
         net.input = nengo.Node(size_in=d)
 
         net.new_ctx = nengo.Node(size_in=d)
-        net.current = GatedMemory(d, in_tr=10, in_syn=0.1)
-        net.old = GatedMemory(d, in_tr=10, in_syn=0.1)
+        net.current = GatedMemory(d)
+        net.old = GatedMemory(d)
 
         nengo.Connection(net.input, net.new_ctx, transform=beta)
         nengo.Connection(
