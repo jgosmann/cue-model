@@ -200,10 +200,9 @@ def Context5(d, beta, **kwargs):
 
         nengo.Connection(net.input, net.new_ctx, transform=beta)
         nengo.Connection(
-            net.old.mem.output, net.new_ctx,
-            transform=np.sqrt(1. - (beta)**2))
-        nengo.Connection(net.new_ctx, net.current.diff.input)
-        nengo.Connection(net.current.mem.output, net.old.diff.input)
+            net.old.output, net.new_ctx, transform=np.sqrt(1. - (beta)**2))
+        nengo.Connection(net.new_ctx, net.current.input)
+        nengo.Connection(net.current.output, net.old.input)
 
         net.bias = nengo.Node(1)
         net.input_update_context = nengo.Node(size_in=1)
