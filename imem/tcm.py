@@ -384,13 +384,13 @@ class NeuralAccumulatorDecisionProcess2(spa.Network):
                 transform=self.vocab.vectors.T)
             nengo.Connection(
                 self.buf.mem.output, self.inhibit.input, transform=0.1)
-            with nengo.presets.ThresholdingEnsembles(0.):
+            with nengo.presets.ThresholdingEnsembles(0.1):
                 self.inhib_thr = nengo.networks.EnsembleArray(50, n_items)
             nengo.Connection(
                 self.inhibit.output, self.inhib_thr.input, #self.state.input,
                 transform=self.vocab.vectors)
             nengo.Connection(self.inhib_thr.output, self.state.input[:-1], transform=-1.5)
 
-            self.noise = nengo.Node(nengo.processes.WhiteNoise(
-                dist=nengo.dists.Gaussian(mean=0., std=0.06 * 0.2)), size_out=n_items+1)
-            nengo.Connection(self.noise, self.state.input)
+            # self.noise = nengo.Node(nengo.processes.WhiteNoise(
+                # dist=nengo.dists.Gaussian(mean=0., std=0.06 * 0.2)), size_out=n_items+1)
+            # nengo.Connection(self.noise, self.state.input)
