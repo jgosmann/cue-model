@@ -184,7 +184,7 @@ class Context6(spa.Network):
 
             self.new_ctx = nengo.Node(size_in=self.vocab.dimensions)
             self.current = GatedMemory(self.vocab)
-            self.buf = GatedMemory(self.vocab)  # TODO required?
+            # self.buf = GatedMemory(self.vocab)  # TODO required?
             self.old = GatedMemory(self.vocab)
 
             nengo.Connection(self.input, self.new_ctx, transform=beta)
@@ -192,38 +192,40 @@ class Context6(spa.Network):
                 self.old.output, self.new_ctx,
                 transform=np.sqrt(1. - (beta)**2))
             nengo.Connection(self.new_ctx, self.current.input)
-            nengo.Connection(self.current.output, self.buf.input)
-            nengo.Connection(self.buf.output, self.old.input)
+            nengo.Connection(self.current.output, self.old.input)
+            # nengo.Connection(self.current.output, self.buf.input)
+            # nengo.Connection(self.buf.output, self.old.input)
 
             self.bias = nengo.Node(1)
             self.input_update_context = nengo.Node(size_in=1)
 
             nengo.Connection(self.bias, self.current.store)
-            nengo.Connection(self.bias, self.old.store)
+            # nengo.Connection(self.bias, self.old.store)
             nengo.Connection(
                 self.input_update_context, self.current.store, transform=-1.,
                 synapse=None)
-            nengo.Connection(
-                self.input_update_context, self.old.store, transform=-1.,
-                synapse=None)
+            # nengo.Connection(
+                # self.input_update_context, self.old.store, transform=-1.,
+                # synapse=None)
 
-            nengo.Connection(self.input_update_context, self.buf.store)
+            nengo.Connection(self.input_update_context, self.old.store)
+            # nengo.Connection(self.input_update_context, self.buf.store)
 
             # TODO is downscale required?
-            self.downscale = spa.State(self.vocab)
-            nengo.Connection(self.buf.output, self.downscale.input)
-            nengo.Connection(
-                self.downscale.output, self.buf.mem.input, transform=-.1)
-            nengo.Connection(
-                self.downscale.output, self.buf.input, transform=-.1)
-            sq = self.old.mem.state_ensembles.add_output('sq', np.square)
-            with nengo.presets.ThresholdingEnsembles(0.):
-                self.downscale_activate = nengo.Ensemble(50, 1)
-            nengo.Connection(self.bias, self.downscale_activate)
-            nengo.Connection(
-                sq, self.downscale_activate,
-                transform=-np.ones((1, sq.size_out)))
-            inhibit_net(self.downscale_activate, self.downscale)
+            # self.downscale = spa.State(self.vocab)
+            # nengo.Connection(self.buf.output, self.downscale.input)
+            # nengo.Connection(
+                # self.downscale.output, self.buf.mem.input, transform=-.1)
+            # nengo.Connection(
+                # self.downscale.output, self.buf.input, transform=-.1)
+            # sq = self.old.mem.state_ensembles.add_output('sq', np.square)
+            # with nengo.presets.ThresholdingEnsembles(0.):
+                # self.downscale_activate = nengo.Ensemble(50, 1)
+            # nengo.Connection(self.bias, self.downscale_activate)
+            # nengo.Connection(
+                # sq, self.downscale_activate,
+                # transform=-np.ones((1, sq.size_out)))
+            # inhibit_net(self.downscale_activate, self.downscale)
 
         self.output = self.current.output
         self.inputs = dict(default=(self.input, vocab))
