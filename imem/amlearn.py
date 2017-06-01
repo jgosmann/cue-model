@@ -18,7 +18,7 @@ class AML(nengo.learning_rules.LearningRuleType, SupportDefaultsMixin):
 
 
 class SimAML(nengo.builder.Operator):
-    def __init__(self, learning_rate, base_decoders, pre, out, error, decoders,
+    def __init__(self, learning_rate, base_decoders, pre, error, decoders,
                  tag=None):
         super(SimAML, self).__init__(tag=tag)
 
@@ -27,13 +27,12 @@ class SimAML(nengo.builder.Operator):
 
         self.sets = []
         self.incs = []
-        self.reads = [pre, out, error]
+        self.reads = [pre, error]
         self.updates = [decoders]
 
     def make_step(self, signals, dt, rng):
         base_decoders = self.base_decoders
         pre = signals[self.pre]
-        out = signals[self.out]
         error = signals[self.error]
         decoders = signals[self.decoders]
         alpha = self.learning_rate * dt
@@ -50,12 +49,8 @@ class SimAML(nengo.builder.Operator):
         return self.reads[0]
 
     @property
-    def out(self):
-        return self.reads[1]
-
-    @property
     def error(self):
-        return self.reads[2]
+        return self.reads[1]
 
     @property
     def decoders(self):
@@ -76,7 +71,6 @@ def build_aml(model, aml, rule):
     model.sig[rule]['in'] = error
 
     pre = model.sig[conn.pre_obj]['in']
-    out = model.sig[conn.pre_obj]['out']
     decoders = model.sig[conn]['weights']
 
     # TODO caching
@@ -89,8 +83,8 @@ def build_aml(model, aml, rule):
 
     x = np.dot(eval_points, encoders.T)
 
-    base_decoders, solver_info = solve_for_decoders(
+    base_decoders, _ = solve_for_decoders(
         conn.solver, conn.pre_obj.neuron_type, gain, bias, x, targets, rng=rng)
 
     model.add_op(SimAML(
-        aml.learning_rate, base_decoders, pre, out, error, decoders))
+        aml.learning_rate, base_decoders, pre, error, decoders))
