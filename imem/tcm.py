@@ -9,7 +9,7 @@ import nengo_spa as spa
 from nengo_spa.vocab import VocabularyOrDimParam
 
 from imem.amlearn import AML
-from imem.modules import GatedMemory
+from imem.modules import GatedMemory, SimilarityThreshold
 from imem.utils.nengo import inhibit_net
 
 
@@ -23,7 +23,6 @@ class TCMEquations(nengo.Network):
         self._recall = np.zeros((1,))
         self.last_stim = None
         self.last_stim_change = 0
-        self.learned = True
 
         with self:
             self.no_learn = nengo.Node(self._no_learn, size_in=1)
@@ -38,8 +37,8 @@ class TCMEquations(nengo.Network):
             return True
 
         return not (
-            x > .5 and self._recall[0] < 0.1 and
-            t - self.last_stim_change > 0.5)
+            x > .5 and self._recall[0] < 0.1 and True)
+            # t - self.last_stim_change > 0.5)
 
     def _set_recall(self, t, x):
         self._recall[:] = x
@@ -119,8 +118,8 @@ class TCM(spa.Network):
 
             # FIXME seed/generation of this
             v = spa.Vocabulary(
-                self.input_vocab.dimensions, rng=np.random.RandomState(42))
-            for i in range(self.output_vocab.dimensions):
+                self.context_vocab.dimensions, rng=np.random.RandomState(42))
+            for i in range(self.item_vocab.dimensions):
                 v.populate('CTX' + str(i))
 
             self.net_m_tf = AssocMatLearning(
@@ -230,7 +229,7 @@ class AssocMatLearning(spa.Network):
             nengo.Connection(self.input_target, self.compare.input_b)
             inhibit_net(self.compare.output, self.target, strength=1.)
 
-            if init_transfoorm is not None:
+            if init_transform is not None:
                 nengo.Connection(
                     self.state.output, self.output, transform=init_transform)
 
