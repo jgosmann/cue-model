@@ -37,3 +37,33 @@ class GatedMemory(spa.Network):
 
         self.inputs = dict(default=(self.diff.input, vocab))
         self.outputs = dict(default=(self.mem.output, vocab))
+
+
+class SimilarityThreshold(spa.Network):
+    vocab = VocabularyOrDimParam('vocab', optional=False, readonly=True)
+
+    def __init__(self, vocab=Default, threshold=1., **kwargs):
+        super(SimilarityThreshold, self).__init__(**kwargs)
+
+        self.vocab = vocab
+
+        with self:
+            self.bias = nengo.Node(1)
+            self.dot = spa.Compare(self.vocab)
+            with nengo.presets.ThresholdingEnsembles(0.0):
+                self.threshold = nengo.Ensemble(150, 1)
+            nengo.Connection(self.bias, self.threshold, transform=-threshold)
+
+            self.output = nengo.Node(size_in=1)
+            self.input_a = self.dot.input_a
+            self.input_b = self.dot.input_b
+
+            nengo.Connection(self.dot.output, self.threshold)
+            nengo.Connection(
+                self.threshold, self.output, function=lambda x: x > 0.,
+                synapse=None)
+
+        self.inputs = dict(
+            input_a=(self.input_a, self.vocab),
+            input_b=(self.input_b, self.vocab))
+        self.outputs = dict(default=(self.output, None))

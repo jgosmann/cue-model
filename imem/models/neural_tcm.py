@@ -16,6 +16,7 @@ class NeuralTCM(pytry.NengoTrial):
         self.param("context dimensionality", context_d=256)
         self.param("contextual drift rate", beta=0.62676)
         self.param("distractor rate", distractor_rate=1.)
+        self.param("noise in recall", noise=0.)
         self.param("protocol", protocol='immed')
 
     def model(self, p):
