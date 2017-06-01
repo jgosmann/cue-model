@@ -39,9 +39,7 @@ class SimAML(nengo.builder.Operator):
         alpha = self.learning_rate * dt
 
         def step_assoc_learning():
-            # scale = 1. - np.dot(error, np.dot(decoders, out))
             scale = 1.
-            # decoders[...] *= (1. - alpha * 0.01)
             decoders[...] += alpha * scale * error[:, None] * np.dot(
                 pre, base_decoders.T)
 
@@ -89,13 +87,10 @@ def build_aml(model, aml, rule):
     eval_points = get_eval_points(model, conn, rng)
     targets = eval_points
 
-    x = np.dot(eval_points, encoders.T)# / Undeferred(
-#        conn.pre_obj, model.simulator, args=(model, conn.pre_obj)).radius)
+    x = np.dot(eval_points, encoders.T)
 
     base_decoders, solver_info = solve_for_decoders(
         conn.solver, conn.pre_obj.neuron_type, gain, bias, x, targets, rng=rng)
-    # base_decoders, solver_info = solve_for_decoders(
-        # conn, gain, bias, x, targets, rng=rng)
 
     model.add_op(SimAML(
         aml.learning_rate, base_decoders, pre, out, error, decoders))
