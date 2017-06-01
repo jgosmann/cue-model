@@ -1,10 +1,10 @@
 import nengo
-import numpy as np
 from nengo.builder.connection import get_eval_points, solve_for_decoders
 from nengo.builder.operator import Reset
 from nengo.builder.signal import Signal
 from nengo.config import SupportDefaultsMixin
 from nengo.params import Default, IntParam
+import numpy as np
 
 
 class AML(nengo.learning_rules.LearningRuleType, SupportDefaultsMixin):
