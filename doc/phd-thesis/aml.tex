@@ -1,13 +1,13 @@
 \chapter{Association Matrix Learning}
 
-The TCM requires two association matrices, $\mat M_\ped{TF}$ and $\mat M_\ped{FT}$, to be updated.
+The TCM requires two association matrices, $\mtf$ and $\mft$, to be updated.
 To translate this into neurons an appropriate learning rule, the association matrix learning rule (AML), has to be derived.
 The TCM gives the update of such an association matrix as
 \begin{eqnarray}
     \mat M_{i+1} =& \mat M_i + \Delta \mat M_i \\
     \Delta \mat M_i =& \vc v_i \vc u_i\Tr
 \end{eqnarray}
-for adding an association from $\vc a$ to $\vc b$.
+for adding an association from $\vc u_i$ to $\vc v_i$.
 The association matrix after $n$ updates can be expressed as
 \begin{equation}
     \mat M_n = M_0 + \sum_{i=1}^{n} \Delta \mat M_i = M_0 + \sum_{i=1}^n \vc v_i \vc u_i\Tr \text{.}
@@ -28,20 +28,153 @@ where $\tilde{\mat D}$ is the matrix of learned decoders.
 
 To implement this within a neural network, the discrete equation has to be converted into continuous form:
 \begin{equation}
-    \od{\tilde{\mat D}}{t} = \eta \vc v(t) \vc u(t)\Tr \mat D
+    \od{\tilde{\mat D}}{t} = \eta \vc v(t) \vc u(t)\Tr \mat D \label{eqn:aml}
 \end{equation}
 with learning rate $\eta$.
 This equation can be directly implemented with the NEF and thus realized with spiking neurons.
-That alone, however, does not ensure the biological plausibility as any mathematical formulations of synaptic weight changes could be implemented with the NEF\@.
+That alone, however, does not ensure the biological plausibility as any mathematical formulation of synaptic weight changes could be implemented with the NEF\@.
+In the following we will look at different interpretations of this learning rule which give different predictions about a neural implementation.
+
+\cref{eqn:aml} can be implemented with basic NEF methods for the most part (see \cref{fig:aml-heterosynaptic}).
+To compute the outer product a network computing the individual pairwise products can be used.
+By applying the transform $\mat D\tr$ (transposed because the transform is applied on the left, not the right as in \cref{eqn:aml}) the learning signal for modulating a connection is obtained.
+As the learning signal is independent of the activity of the pre- and post-synaptic populations, the learning rule corresponds to heterosynaptic plasticity.
+\begin{figure}
+    \centering
+    \begin{tikzpicture}[nef]
+        \node [ens] (cue) at (0, 0) {$\vc u$};
+        \node [ens] (target) at (2, 0) {$\vc v$};
+        \node [net] (outer) at (1, -1.5) {$\vc u \vc v\Tr$};
+        \node [ens] (pre) at (0, -3) {$\vc x$};
+        \node [ens] (post) at (2, -3) {$\vc y$};
+
+        \path [draw] (cue) edge [bend left] ([xshift=-1mm]outer.north);
+        \path [draw] (target) edge [bend right] ([xshift=1mm]outer.north);
+        \path [draw] (pre) -> node (lrule) {} (post);
+        \path [draw] (outer) edge [modulatory, "$\mat D\Tr$"] (lrule.center);
+    \end{tikzpicture}
+    \caption{
+        Heterosynaptic plasticity interpretation of the Association Matrix Learning Rule.
+        A network is used to calculate the outer product $\vc u \vc v\tr$ and the result transformed with $\mat D\Tr$ modifies the connection weights from $\vc x$ to $\vc y$.
+    }\label{fig:aml-heterosynaptic}
+\end{figure}
+
+(TODO refs for this para)
+Interestingly, this requires a number of neural populations (representing $\vc u$, $\vc v$, and calculating the outer product) for initial encoding of an association, but not for recall of that association.
+This analogous to findings that the dentate gyrus is required for the initial encoding of experiences, but not for the recall of those experiences.
+Also, calculating the outer product requires $d_{\vc u} d_{\vc v}$ neural ensembles where $d_{\vc u}$ and $d_{\vc v}$ are the vector dimensionilities.
+While we do not know how many neurons would be employed for each product, it suggests a comparably large number of neurons.
+This is consistent with TODO dentate gyrus neuron numbers.
+Finally, the mossy fibers from dentate gyrus targeting CA3 have been found to induce heterosynaptic plasticity.
+However, one property of dentate gyrus, the sparse firing, is not explained by this.
+Another open question is the developmental process to produce the precise connections weights to implement the $\mat D\tr$ transform where $\mat D$ depends on the $\vc x$ population.
+
+\begin{figure}
+    \centering
+    \begin{tikzpicture}[nef]
+        \node [ens] (cue) at (0, 0) {$\vc u$};
+        \node [ens] (target) at (2, 0) {$\vc v$};
+        \node [ens] (pre) at (0, -1.5) {$\vc x$};
+        \node [ens] (post) at (2, -1.5) {$\vc y$};
+
+        \path [draw] (pre) -> node (lrule) {} (post);
+        \path [draw] (cue) edge [modulatory, bend left] ([xshift=-1mm]lrule.center);
+        \path [draw] (target) edge [modulatory, bend right] ([xshift=1mm]lrule.center);
+    \end{tikzpicture}
+    \caption{
+        Multiplicative heterosynaptic plasticity interpretation of the Association Matrix Learning Rule.
+    }\label{fig:aml-mult-heterosynaptic}
+\end{figure}
+
+Another interpretation of the AML is that the outer product is computed through synaptic interactions on the dendrite (see \cref{fig:aml-mult-heterosynaptic}).
+Here, both $\vc u$ and $\vc v$ induce heterosynaptic plasticity directly, but the actual weight change is determined by a non-linear interaction of these two sources.
+To get a better sense of the connectivity structure implied by this, it is instructive to write the learning rules in terms of neural activities and then write down how a single synaptic weight is affected.
+
+
 To get a better sense of the biological plausibility it is useful to obtain a formulation of the learning rule in terms of neural activities by replacing the decoded values, yielding
 \begin{eqnarray}
-    \od{\tilde{\mat D}}{t} =& \eta (D_v a_v(t)) (D a_u(t))\Tr D \\
-    =& \eta D_v (a_v(t) a_u\Tr(t)) D\Tr D \text{.}
+    \od{\tilde{\mat D}}{t} =& \eta [\mat D_v a_v(t)] [\mat D_u a_u(t)]\Tr \mat D \\
+    =& \eta \mat D_v [a_v(t) a_u(t)\Tr] \mat D_u\Tr \mat D
 \end{eqnarray}
-Here, $D\Tr D$ gives a correlation matrix of neurons representing the same dimension and $a_v(t) a_u\Tr(t)$ can be interpreted as a \emph{modulatory Hebbian term}.
-Unlike a standard Hebbian term it does not connect neurons that fire together, but the combined firing of two neurons modulates the connection of one of these neurons to a third population (see Fig.~TODO).
-If the population $u$ projects to is used as the $v$ input population, this rule will become truly Hebbian and neurons that fire together will connect with respect to the weighting introduced by $D_v$ and $D\Tr D$.
-Note that in contrast to many other learning rules AML does not produce destructive interference due to the correlation matrix term.
+for the decoder change or
+\begin{eqnarray}
+    \od{\tilde{\mat W}}{t} =& \eta \mat E \mat D_v [a_v(t) a_u(t)\Tr] \mat D_u\Tr \mat D
+\end{eqnarray}
+for the weight change.
+Here, $D\Tr D$ gives a correlation matrix of decoders and $a_v(t) a_u\Tr(t)$ can be interpreted as a \emph{modulatory Hebbian term}.
+Unlike a standard Hebbian term it does not connect neurons that fire together, but the combined firing of two neurons modulates the ability to form a connection of one of these neurons to a third neural population (see \cref{fig:aml-structure}).
+\begin{figure}
+    \centering
+    \begin{tikzpicture}[nef]
+        \node [ens] (pre) at (0, 0) {$\vc u$};
+        \node [ens] (post) at (2, 0) {$\vc v'$};
+        \node [ens] (err) at (0, 1) {$\vc v$};
+        \path [draw] (pre) -> node (lrule) {} (post);
+        \path [draw, out=0, in=90] (err) edge [modulatory] (lrule.center);
+    \end{tikzpicture}
+    \caption{Structure of the Association Matrix Learning rule (AML). The target vector $\vc v$ modulates the connection weight changes of the connection $\vc u$ to $\vc v'$.}\label{fig:aml-structure}
+\end{figure}
+If the population $\vc v'$, that the $\vc u$ population projects to, is used as the $\vc v$ input population, this rule will become closer to Hebbian learning where the weight change is dependent on pre- and post-synaptic activity instead of the activity of a third error population (see \cref{fig:aml-structure-hebb}).
+\begin{figure}
+    \centering
+    \begin{tikzpicture}[nef]
+        \node [ens] (pre) at (0, 0) {$\vc u$};
+        \node [ens] (post) at (2, 0) {$\vc v$};
+        \path [draw] (pre) -> node (lrule) {} (post);
+        \path [draw, out=110, in=90] (post) edge [modulatory] (lrule.center);
+    \end{tikzpicture}
+    \caption{Structure of the Association Matrix Learning rule (AML) when using the post-synaptic ensemble $\vc v$ to also provide the target vector.}\label{fig:aml-structure-hebb}
+\end{figure}
+
+This formulation of the learning rule still hides how the connectivity is modulated on the single neuron level.
+To get a better insight in the biological plausibility it is helpful to write down the change of single a single connection weight as
+\begin{eqnarray}
+    \od{\tilde{\mat W}_{im}} =& \eta \sum_{j,k,l} \mat E_{ij} \sbr{\mat D_v}_{jk} \sbr{a_v(t)}_k \sbr{a_u(t)}_l \sbr{\mat D\Tr D}_{lm} \\
+    =& \eta \left( \sum_{j,k} \mat E_{ij} \sbr{\mat D_v}_{jk} \sbr{a_v(t)}_k \right) \left( \sum_l \sbr{a_u(t)}_l \sbr{\mat D\Tr D}_{lm} \right)\,\text{.}
+\end{eqnarray}
+This shows that the connection weight $\tilde{\mat W}_{im}$ from neuron $m$ to neuron $i$ is modulated by weighted activity from the pre-synaptic population and weighted activity from the population representing the target vector (see \cref{fig:aml-single-weight}).
+\begin{figure}
+    \centering
+    \begin{tikzpicture}[nef]
+        \node [ens] (pre0) at (0, 0) {};
+        \node [ens] (pre1) at (0, -1) {$m$};
+        \node [ens] (pre2) at (0, -2) {};
+        \node [ens] (pre3) at (0, -3) {};
+
+        \node [ens] (post0) at (7, 0) {};
+        \node [ens] (post1) at (7, -1) {$i$};
+        \node [ens] (post2) at (7, -2) {};
+        \node [ens] (post3) at (7, -3) {};
+
+        \node [ens] (err0) at (2, 2) {};
+        \node [ens] (err1) at (3, 2) {};
+        \node [ens] (err2) at (4, 2) {};
+        \node [ens] (err3) at (5, 2) {};
+
+        \node [rotate=90] (pre-label) at (-0.75, -1.5) {pre-synaptic};
+        \node [rotate=90] (post-label) at (7.75, -1.5) {post-synaptic};
+        \node (err-label) at (3.5, 2.75) {target};
+
+        \node at (5.5, 1) {$\mat E \mat D_{\vc v}$};
+        \node at (1.25, -3.25) {$\mat D\Tr \mat D$};
+
+        \path [draw] (pre1) -> node [below] (w) {$\tilde{\mat W}_{im}$} (post1);
+        \foreach \x in {0, 1, 2, 3} {
+            \path [draw, out=270, in=90] (err\x) edge [modulatory] (w.north);
+        }
+        \path [draw, out=0, in=135] (pre0) edge [modulatory] (w);
+        \path [draw, out=0, in=225] (pre2) edge [modulatory] (w);
+        \path [draw, out=0, in=225] (pre3) edge [modulatory] (w);
+    \end{tikzpicture}
+    \caption{Modulation of single weights with the AML.}\label{fig:aml-single-weight}
+\end{figure}
+
+
+pure feed forward, no attractor net
+maybe implemented in more complicated network
+
+
+Note that in contrast to many other learning rules AML does not produce destructive interference due to the correlation matrix term. % catastrophic forgetting
 
 Note that the AML, like many other Hebbian-style learning rules, allows weights to grow without bound.
 By introducing a factor of $1 - v(t)\Tr \hat{v}(t)$ this can be prevented, but similar to other weight normalizations it introduces the need for each weight to have access to the global population activity and weights as $\hat{v}(t) = \tilde{\mat D} a_u(t)$.
