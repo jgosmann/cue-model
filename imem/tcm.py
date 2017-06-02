@@ -13,37 +13,6 @@ from imem.modules import GatedMemory, SimilarityThreshold
 from imem.utils.nengo import inhibit_net
 
 
-class TCMEquations(nengo.Network):
-    """Provides direct implementation of TCM equations in nodes."""
-    def __init__(self, control):
-        super(TCMEquations, self).__init__(label="TCM Equations")
-
-        self.control = control
-
-        self._recall = np.zeros((1,))
-        self.last_stim = None
-        self.last_stim_change = 0
-
-        with self:
-            self.no_learn = nengo.Node(self._no_learn, size_in=1)
-            self.recall = nengo.Node(self._set_recall, size_in=1)
-
-    def _no_learn(self, t, x):
-        if self.last_stim != self.control.current_stim:
-            self.last_stim = self.control.current_stim
-            self.last_stim_change = t
-
-        if self.control.current_stim.startswith('D'):
-            return True
-
-        return not (
-            x > .5 and self._recall[0] < 0.1 and True)
-            # t - self.last_stim_change > 0.5)
-
-    def _set_recall(self, t, x):
-        self._recall[:] = x
-
-
 class Control(nengo.Network):
     def __init__(self, protocol, item_d, distractor_rate, rng=np.random):
         super(Control, self).__init__(label="Control")
@@ -68,8 +37,12 @@ class Control(nengo.Network):
             self.response_in = nengo.Node(
                 self._handle_response, size_in=item_d)
             self.recalled_out = nengo.Node(self._recalled_list)
-            stimulus_fn = self.protocol.make_stimulus_fn(distractor_rate)
             self.current_stim = None
+            self.no_learn = nengo.Node(
+                lambda t: (self.protocol.is_recall_phase(t) or
+                           self.current_stim is None or
+                           self.current_stim.startswith('D')))
+            stimulus_fn = self.protocol.make_stimulus_fn(distractor_rate)
             def store_current_stim(t):
                 if self.protocol.is_pres_phase:
                     self.current_stim = stimulus_fn(t)
@@ -113,7 +86,6 @@ class TCM(spa.Network):
         self.context_vocab = context_vocab
 
         with self:
-            self.tcm = TCMEquations(control)
             self.ctrl = control
 
             # FIXME seed/generation of this
@@ -128,11 +100,11 @@ class TCM(spa.Network):
                 self.item_vocab, self.context_vocab,
                 init_transform=v.vectors)
 
-            nengo.Connection(self.ctrl.recall_phase, self.tcm.recall)
-
             nengo.Connection(self.ctrl.stimulus, self.net_m_ft.input_cue)
-            nengo.Connection(self.tcm.no_learn, self.net_m_ft.no_learn)
-            nengo.Connection(self.tcm.no_learn, self.net_m_tf.no_learn)
+            self.no_learn = nengo.Node(size_in=1)
+            nengo.Connection(self.ctrl.no_learn, self.no_learn, transform=2.)
+            nengo.Connection(self.no_learn, self.net_m_ft.no_learn)
+            nengo.Connection(self.no_learn, self.net_m_tf.no_learn)
 
             self.recalled_ctx = GatedMemory(self.context_vocab)
             nengo.Connection(self.net_m_ft.output, self.recalled_ctx.input)
@@ -158,7 +130,8 @@ class TCM(spa.Network):
                 self.ctrl.stimulus, self.last_item.input, transform=1.,
                 synapse=0.1)
 
-            nengo.Connection(self.sim_th.output, self.tcm.no_learn)
+            nengo.Connection(self.bias, self.no_learn)
+            nengo.Connection(self.sim_th.output, self.no_learn, transform=-1)
 
             self.recall = NeuralAccumulatorDecisionProcess(self.ctrl.vocab)
             self.recall_gate = spa.State(self.item_vocab)
