@@ -14,12 +14,15 @@ class FreeRecall(object):
         Interpresentation interval in seconds.
     ri : float
         Retention interval.
+    distractor_rate : float
+        Rate of distractors in items per second.
     """
-    def __init__(self, n_items, pi, ipi, ri):
+    def __init__(self, n_items, pi, ipi, ri, distractor_rate):
         self.n_items = n_items
         self.pi = pi
         self.ipi = ipi
         self.ri = ri
+        self.distractor_rate = distractor_rate
         self.pres_phase_duration = (
             self.n_items * self.pi + (self.n_items - 1) * self.ipi)
         self.duration = self.pres_phase_duration + self.ri
@@ -32,20 +35,36 @@ class FreeRecall(object):
     def get_item(i):
         return 'V' + str(int(i))
 
+    def get_all_items(self):
+        return [self.get_item(i) for i in range(self.n_items)]
+
+    def get_all_distractors(self):
+        return [self.get_distractor(epoch, i)
+                for epoch in self.n_epochs
+                for i in range(self.n_distractors_per_epoch)]
+
+    @property
+    def n_epochs(self):
+        return self.n_items
+
+    @property
+    def n_distractors_per_epoch(self):
+        return int(np.ceil(self.distractor_rate * max(self.ipi, self.ri)))
+
     def is_pres_phase(self, t):
         return t <= self.pres_phase_duration + self.ri
 
     def is_recall_phase(self, t):
         return t > self.pres_phase_duration + self.ri
 
-    def make_stimulus_fn(self, distractor_rate):
+    def make_stimulus_fn(self):
         def stimulus_fn(t):
             if t > self.pres_phase_duration:
                 retention_t = t - self.pres_phase_duration
                 if retention_t <= self.ri:
                     stimulus = self.get_distractor(
                         epoch=self.n_items - 1,
-                        i=int(distractor_rate * retention_t))
+                        i=int(self.distractor_rate * retention_t))
                 else:
                     stimulus = '0'
             else:
@@ -56,7 +75,7 @@ class FreeRecall(object):
                 else:
                     stimulus = self.get_distractor(
                         epoch=epoch,
-                        i=int(distractor_rate * (epoch_t - self.pi)))
+                        i=int(self.distractor_rate * (epoch_t - self.pi)))
             return stimulus
         return stimulus_fn
 

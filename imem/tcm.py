@@ -20,127 +20,122 @@ class Control(nengo.Network):
     ----------
     protocol : FreeRecall
         Definition of experimental protocol.
-    item_d : int
-        Dimensionality of item vectors.
-    distractor_rate : float
-        Rate of distractors.
-    rng : numpy.random.RandomState
-        Random number generator for initializing the item vocabulary.
+    item_vocab : nengo_spa.Vocabulary
+        Item vocabulary.
 
     Attributes
     ----------
     item_vocab : nengo_spa.Vocabulary
         Item vocabulary.
-
+    output_pres_phase : nengo.Node
+        Outputs 1 during the presentation phase, 0 otherwise.
+    output_recall_phase : nengo.Node
+        Outputs 1 during the recall phase, 0 otherwise.
+    output_no_learn : nengo.Node
+        Outputs 1 when learning should be disabled.
+    output_stimulus : nengo.Node
+        Outputs current stimulus.
     """
-    def __init__(self, protocol, item_d, distractor_rate, rng=np.random):
+    def __init__(self, protocol, item_vocab):
         super(Control, self).__init__(label="Control")
         self.protocol = protocol
-        self.next_recall = 0
-
-        self.item_vocab = spa.Vocabulary(item_d, rng=rng, strict=False)
-        for i in range(self.protocol.n_items):
-            self.item_vocab.add('V' + str(i), self.item_vocab.create_pointer())
-
-        self.responses = []
-        self.response_times = []
+        self.item_vocab = item_vocab
 
         with self:
-            self.pres_phase = nengo.Node(self.protocol.is_pres_phase)
-            self.recall_phase = nengo.Node(self.protocol.is_recall_phase)
-            self.init_recall_ctx = nengo.Node(
-                lambda t: len(self.responses) > 0)
-            self.neg_init_recall_ctx = nengo.Node(
-                lambda t: len(self.responses) <= 0 and
-                self.protocol.is_recall_phase(t))
-            self.response_in = nengo.Node(
-                self._handle_response, size_in=item_d)
-            self.recalled_out = nengo.Node(self._recalled_list)
-            self.current_stim = None
-            self.no_learn = nengo.Node(
+            self.output_pres_phase = nengo.Node(self.protocol.is_pres_phase)
+            self.output_recall_phase = nengo.Node(
+                self.protocol.is_recall_phase)
+
+            self._current_stim = None
+            self.output_no_learn = nengo.Node(
                 lambda t: (self.protocol.is_recall_phase(t) or
-                           self.current_stim is None or
-                           self.current_stim.startswith('D')))
-            stimulus_fn = self.protocol.make_stimulus_fn(distractor_rate)
+                           self._current_stim is None or
+                           self._current_stim.startswith('D')))
+
+            stimulus_fn = self.protocol.make_stimulus_fn()
             def store_current_stim(t):
                 if self.protocol.is_pres_phase:
-                    self.current_stim = stimulus_fn(t)
-                    return self.item_vocab.parse(self.current_stim).v
+                    self._current_stim = stimulus_fn(t)
+                    return self.item_vocab.parse(self._current_stim).v
                 else:
-                    return np.zeros(item_d)
-            self.stimulus = nengo.Node(store_current_stim)
-
-    def _handle_response(self, t, x):
-        dots = np.dot(self.item_vocab.vectors, x)
-        idx = np.argmax(dots)
-        if dots[idx] < 0.8:
-            return dots[idx]
-        if idx not in self.responses and (
-                len(self.response_times) <= 0 or
-                self.response_times[-1] + 0.1 < t):
-            self.responses.append(idx)
-            self.response_times.append(t)
-        return dots[idx]
-
-    def _recalled_list(self, t):
-        if len(self.responses) <= 0:
-            return np.zeros(self.item_vocab.dimensions)
-        v = np.sum(self.item_vocab.vectors[self.responses], axis=0)
-        v /= np.linalg.norm(v)
-        return v
+                    return np.zeros(self.item_vocab.dimensions)
+            self.output_stimulus = nengo.Node(store_current_stim)
 
 
 class TCM(spa.Network):
+    """Network implementing the Temporal Context Model (TCM).
+
+    Parameters
+    ----------
+    beta : float
+        TCM beta parameter, the amount of context drift with each item.
+    protocol : FreeRecall
+        Experimental protocol.
+    item_vocab : nengo_spa.Vocabulary or int
+        Item vocabulary.
+    context_vocab : nengo_spa.Vocabulary or int
+        Context vocabulary.
+    kwargs : dict
+        Passed on to `nengo_spa.Network`.
+
+    Attributes
+    ----------
+    item_vocab : nengo_spa.Vocabulary
+        Item vocabulary.
+    context_vocab : nengo_spa.Vocabulary
+        Context vocabulary.
+    output : nengo.Node
+        Output of recalled vectors.
+    """
     item_vocab = VocabularyOrDimParam(
         'item_vocab', optional=False, readonly=True)
     context_vocab = VocabularyOrDimParam(
         'context_vocab', optional=False, readonly=True)
 
     def __init__(
-            self, beta, control, item_vocab=Default,
-            context_vocab=Default, **kwargs):
+            self, beta, protocol, item_vocab=Default, context_vocab=Default,
+            **kwargs):
         super(TCM, self).__init__(**kwargs)
 
         self.item_vocab = item_vocab
         self.context_vocab = context_vocab
 
+        # Fill vocabularies
+        self.item_vocab.populate(';'.join(protocol.get_all_items()))
+        self.item_vocab.populate(';'.join(protocol.get_all_distractors()))
+        for i in range(self.item_vocab.dimensions):
+            self.context_vocab.populate('CTX' + str(i))
+
+        self.ctrl = Control(protocol, self.item_vocab)
+
         with self:
-            self.ctrl = control
+            self.bias = nengo.Node(1.)
 
-            # FIXME seed/generation of this
-            v = spa.Vocabulary(
-                self.context_vocab.dimensions, rng=np.random.RandomState(42))
-            for i in range(self.item_vocab.dimensions):
-                v.populate('CTX' + str(i))
-
+            # Association networks
             self.net_m_tf = AssocMatLearning(
                 self.context_vocab, self.item_vocab)
             self.net_m_ft = AssocMatLearning(
                 self.item_vocab, self.context_vocab,
-                init_transform=v.vectors)
+                init_transform=self.context_vocab.vectors)
 
+            # Stimulus input
             nengo.Connection(self.ctrl.stimulus, self.net_m_ft.input_cue)
-            self.no_learn = nengo.Node(size_in=1)
-            nengo.Connection(self.ctrl.no_learn, self.no_learn, transform=2.)
-            nengo.Connection(self.no_learn, self.net_m_ft.no_learn)
-            nengo.Connection(self.no_learn, self.net_m_tf.no_learn)
+            nengo.Connection(self.ctrl.stimulus, self.net_m_tf.input_target)
 
+            # Context networks
             self.recalled_ctx = GatedMemory(self.context_vocab)
             nengo.Connection(self.net_m_ft.output, self.recalled_ctx.input)
-
             self.current_ctx = Context(beta, self.context_vocab)
             nengo.Connection(
                 self.current_ctx.output, self.net_m_ft.input_target)
 
-            nengo.Connection(self.ctrl.stimulus, self.net_m_tf.input_target)
-
             nengo.Connection(self.recalled_ctx.output, self.current_ctx.input)
 
+            # Determining update progress
             self.last_item = spa.State(self.item_vocab, feedback=1.)
             self.sim_th = SimilarityThreshold(self.item_vocab)
             nengo.Connection(self.ctrl.stimulus, self.sim_th.input_a)
             nengo.Connection(self.last_item.output, self.sim_th.input_b)
-            self.bias = nengo.Node(1.)
             nengo.Connection(self.bias, self.current_ctx.input_update_context)
             nengo.Connection(
                 self.sim_th.output, self.current_ctx.input_update_context,
@@ -149,16 +144,25 @@ class TCM(spa.Network):
                 self.ctrl.stimulus, self.last_item.input, transform=1.,
                 synapse=0.1)
 
+            # Control of learning
+            self.no_learn = nengo.Node(size_in=1)
+            nengo.Connection(self.ctrl.no_learn, self.no_learn, transform=2.)
+            nengo.Connection(self.no_learn, self.net_m_ft.no_learn)
+            nengo.Connection(self.no_learn, self.net_m_tf.no_learn)
+
             nengo.Connection(self.bias, self.no_learn)
             nengo.Connection(self.sim_th.output, self.no_learn, transform=-1)
 
-            self.recall = NeuralAccumulatorDecisionProcess(self.ctrl.vocab)
+            # Recall
+            self.recall = NeuralAccumulatorDecisionProcess(
+                self.item_vocab.create_subset(protocol.get_all_items()))
             self.recall_gate = spa.State(self.item_vocab)
             nengo.Connection(self.current_ctx.output, self.net_m_tf.input_cue)
             nengo.Connection(self.net_m_tf.output, self.recall_gate.input)
             nengo.Connection(self.recall_gate.output, self.recall.input)
             nengo.Connection(
                 self.recall.buf.mem.output, self.net_m_ft.input_cue)
+
             inhibit_net(self.ctrl.pres_phase, self.recall_gate)
             inhibit_net(self.ctrl.pres_phase, self.recall.buf.mem, strength=6)
             inhibit_net(self.ctrl.pres_phase, self.recall.state)
@@ -168,6 +172,7 @@ class TCM(spa.Network):
             nengo.Connection(
                 self.recall.buf.output, self.last_item.input, synapse=0.1)
 
+            # Initialization of context
             initial_ctx = self.context_vocab.create_pointer().v
             ctx_init = nengo.Node(
                 lambda t: initial_ctx if t < 0.3 else np.zeros(
@@ -176,6 +181,10 @@ class TCM(spa.Network):
             nengo.Connection(
                 nengo.Node(lambda t: 4 if t < 0.3 else 0),
                 self.current_ctx.old.input_store)
+
+            self.output = self.recall.buf.output
+
+        self.outputs = dict(default=(self.output, self.item_vocab))
 
 
 class AssocMatLearning(spa.Network):
@@ -193,7 +202,6 @@ class AssocMatLearning(spa.Network):
         self.output_vocab = output_vocab
 
         with self:
-            d = self.input_vocab.dimensions
             self.state = spa.State(self.input_vocab, subdimensions=64)
             for e in self.state.all_ensembles:
                 e.radius = 0.5

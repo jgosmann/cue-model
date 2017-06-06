@@ -1,5 +1,7 @@
 from __future__ import absolute_import
 
+from functools import partial
+
 import nengo
 import nengo_spa as spa
 import numpy as np
@@ -10,6 +12,17 @@ from imem import tcm
 
 
 class NeuralTCM(pytry.NengoTrial):
+    PROTOCOLS = {
+        'contdist': partial(protocols.FreeRecall, pi=1.2, ipi=16., ri=16.),
+        'delayed': partial(protocols.FreeRecall, pi=1.2, ipi=0., ri=16.),
+        'immed': partial(protocols.FreeRecall, pi=1., ipi=0., ri=0.),
+    }
+
+    @classmethod
+    def get_proto(cls, p):
+        return cls.PROTOCOLS[p.protocol](
+            n_items=p.n_items, distractor_rate=p.distractor_rate)
+
     def params(self):
         self.param("List length to remember", n_items=12)
         self.param("item dimensionality", item_d=256)
@@ -23,32 +36,20 @@ class NeuralTCM(pytry.NengoTrial):
         with spa.Network(seed=p.seed) as model:
             model.config[spa.State].represent_identity = False
 
-            proto = {
-                'contdist': protocols.FreeRecall(
-                    n_items=p.n_items, pi=1.2, ipi=16., ri=16.),
-                'delayed': protocols.FreeRecall(
-                    n_items=p.n_items, pi=1.2, ipi=0., ri=16.),
-                'immed': protocols.FreeRecall(
-                    n_items=p.n_items, pi=1., ipi=0., ri=0.),
-            }[p.protocol]
-
-            self.control = tcm.Control(
-                proto, p.item_d, p.distractor_rate,
-                np.random.RandomState(p.seed + 1))
-
-            model.tcm = tcm.TCM(p.beta, self.control, p.item_d, p.context_d)
-
-            self.p_recalls = nengo.Probe(
-                model.tcm.recall.buf.mem.output, synapse=0.01)
+            proto = self.get_proto(p)
+            model.tcm = tcm.TCM(p.beta, proto, p.item_d, p.context_d)
+            self.p_recalls = nengo.Probe(model.tcm.output, synapse=0.01)
 
         self._model = model
         return model
 
     def evaluate(self, p, sim, plt):
-        sim.run(self.control.protocol.duration + 60.)
+        proto = self.get_proto(p)
 
-        recall_vocab = self.control.vocab.create_subset(
-            ['V' + str(i) for i in range(self.control.protocol.n_items)])
+        sim.run(proto.duration + 60.)
+
+        recall_vocab = self._model.item_vocab.create_subset(
+            proto.get_all_items())
         similarity = spa.similarity(sim.data[self.p_recalls], recall_vocab)
         above_threshold = similarity[np.max(similarity, axis=1) > 0.8, :]
         responses = []
