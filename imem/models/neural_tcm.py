@@ -48,7 +48,7 @@ class NeuralTCM(pytry.NengoTrial):
 
         sim.run(proto.duration + 60.)
 
-        recall_vocab = self._model.item_vocab.create_subset(
+        recall_vocab = self._model.tcm.item_vocab.create_subset(
             proto.get_all_items())
         similarity = spa.similarity(sim.data[self.p_recalls], recall_vocab)
         above_threshold = similarity[np.max(similarity, axis=1) > 0.8, :]

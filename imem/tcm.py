@@ -4,6 +4,7 @@ import numpy as np
 
 import nengo
 from nengo.config import Default
+from nengo.utils.compat import is_integer
 from nengo.utils.least_squares_solvers import RandomizedSVD
 import nengo_spa as spa
 from nengo_spa.vocab import VocabularyOrDimParam
@@ -42,15 +43,17 @@ class Control(nengo.Network):
         self.item_vocab = item_vocab
 
         with self:
-            self.output_pres_phase = nengo.Node(self.protocol.is_pres_phase)
+            self.output_pres_phase = nengo.Node(
+                self.protocol.is_pres_phase, label='output_pres_phase')
             self.output_recall_phase = nengo.Node(
-                self.protocol.is_recall_phase)
+                self.protocol.is_recall_phase, label='output_recall_phase')
 
             self._current_stim = None
             self.output_no_learn = nengo.Node(
                 lambda t: (self.protocol.is_recall_phase(t) or
                            self._current_stim is None or
-                           self._current_stim.startswith('D')))
+                           self._current_stim.startswith('D')),
+                label='output_no_learn')
 
             stimulus_fn = self.protocol.make_stimulus_fn()
             def store_current_stim(t):
@@ -59,7 +62,8 @@ class Control(nengo.Network):
                     return self.item_vocab.parse(self._current_stim).v
                 else:
                     return np.zeros(self.item_vocab.dimensions)
-            self.output_stimulus = nengo.Node(store_current_stim)
+            self.output_stimulus = nengo.Node(
+                store_current_stim, label='output_stimulus')
 
 
 class TCM(spa.Network):
@@ -98,18 +102,20 @@ class TCM(spa.Network):
         super(TCM, self).__init__(**kwargs)
 
         self.item_vocab = item_vocab
+        if is_integer(context_vocab):
+            context_vocab = spa.Vocabulary(context_vocab)
         self.context_vocab = context_vocab
 
         # Fill vocabularies
         self.item_vocab.populate(';'.join(protocol.get_all_items()))
-        self.item_vocab.populate(';'.join(protocol.get_all_distractors()))
+        if protocol.n_distractors_per_epoch > 0:
+            self.item_vocab.populate(';'.join(protocol.get_all_distractors()))
         for i in range(self.item_vocab.dimensions):
             self.context_vocab.populate('CTX' + str(i))
 
-        self.ctrl = Control(protocol, self.item_vocab)
-
         with self:
             self.bias = nengo.Node(1.)
+            self.ctrl = Control(protocol, self.item_vocab)
 
             # Association networks
             self.net_m_tf = AssocMatLearning(
@@ -119,8 +125,8 @@ class TCM(spa.Network):
                 init_transform=self.context_vocab.vectors)
 
             # Stimulus input
-            nengo.Connection(self.ctrl.stimulus, self.net_m_ft.input_cue)
-            nengo.Connection(self.ctrl.stimulus, self.net_m_tf.input_target)
+            nengo.Connection(self.ctrl.output_stimulus, self.net_m_ft.input_cue)
+            nengo.Connection(self.ctrl.output_stimulus, self.net_m_tf.input_target)
 
             # Context networks
             self.recalled_ctx = GatedMemory(self.context_vocab)
@@ -134,19 +140,20 @@ class TCM(spa.Network):
             # Determining update progress
             self.last_item = spa.State(self.item_vocab, feedback=1.)
             self.sim_th = SimilarityThreshold(self.item_vocab)
-            nengo.Connection(self.ctrl.stimulus, self.sim_th.input_a)
+            nengo.Connection(self.ctrl.output_stimulus, self.sim_th.input_a)
             nengo.Connection(self.last_item.output, self.sim_th.input_b)
             nengo.Connection(self.bias, self.current_ctx.input_update_context)
             nengo.Connection(
                 self.sim_th.output, self.current_ctx.input_update_context,
                 transform=-1.)
             nengo.Connection(
-                self.ctrl.stimulus, self.last_item.input, transform=1.,
+                self.ctrl.output_stimulus, self.last_item.input, transform=1.,
                 synapse=0.1)
 
             # Control of learning
             self.no_learn = nengo.Node(size_in=1)
-            nengo.Connection(self.ctrl.no_learn, self.no_learn, transform=2.)
+            nengo.Connection(
+                self.ctrl.output_no_learn, self.no_learn, transform=2.)
             nengo.Connection(self.no_learn, self.net_m_ft.no_learn)
             nengo.Connection(self.no_learn, self.net_m_tf.no_learn)
 
@@ -163,10 +170,11 @@ class TCM(spa.Network):
             nengo.Connection(
                 self.recall.buf.mem.output, self.net_m_ft.input_cue)
 
-            inhibit_net(self.ctrl.pres_phase, self.recall_gate)
-            inhibit_net(self.ctrl.pres_phase, self.recall.buf.mem, strength=6)
-            inhibit_net(self.ctrl.pres_phase, self.recall.state)
-            inhibit_net(self.ctrl.pres_phase, self.recall.inhibit)
+            inhibit_net(self.ctrl.output_pres_phase, self.recall_gate)
+            inhibit_net(
+                self.ctrl.output_pres_phase, self.recall.buf.mem, strength=6)
+            inhibit_net(self.ctrl.output_pres_phase, self.recall.state)
+            inhibit_net(self.ctrl.output_pres_phase, self.recall.inhibit)
 
             nengo.Connection(self.recall.buf.output, self.sim_th.input_a)
             nengo.Connection(

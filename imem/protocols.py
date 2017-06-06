@@ -40,7 +40,7 @@ class FreeRecall(object):
 
     def get_all_distractors(self):
         return [self.get_distractor(epoch, i)
-                for epoch in self.n_epochs
+                for epoch in range(self.n_epochs)
                 for i in range(self.n_distractors_per_epoch)]
 
     @property
