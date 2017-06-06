@@ -56,6 +56,7 @@ class Control(nengo.Network):
                 label='output_no_learn')
 
             stimulus_fn = self.protocol.make_stimulus_fn()
+
             def store_current_stim(t):
                 if self.protocol.is_pres_phase:
                     self._current_stim = stimulus_fn(t)
@@ -75,6 +76,8 @@ class TCM(spa.Network):
         TCM beta parameter, the amount of context drift with each item.
     protocol : FreeRecall
         Experimental protocol.
+    recall_noise : float
+        Standard deviation of Gaussian noise to add in recall.
     item_vocab : nengo_spa.Vocabulary or int
         Item vocabulary.
     context_vocab : nengo_spa.Vocabulary or int
@@ -96,9 +99,10 @@ class TCM(spa.Network):
     context_vocab = VocabularyOrDimParam(
         'context_vocab', optional=False, readonly=True)
 
+    # pylint: disable=too-many-statements,too-many-arguments
     def __init__(
-            self, beta, protocol, item_vocab=Default, context_vocab=Default,
-            **kwargs):
+            self, beta, protocol, recall_noise=0., item_vocab=Default,
+            context_vocab=Default, **kwargs):
         super(TCM, self).__init__(**kwargs)
 
         self.item_vocab = item_vocab
@@ -125,8 +129,10 @@ class TCM(spa.Network):
                 init_transform=self.context_vocab.vectors)
 
             # Stimulus input
-            nengo.Connection(self.ctrl.output_stimulus, self.net_m_ft.input_cue)
-            nengo.Connection(self.ctrl.output_stimulus, self.net_m_tf.input_target)
+            nengo.Connection(
+                self.ctrl.output_stimulus, self.net_m_ft.input_cue)
+            nengo.Connection(
+                self.ctrl.output_stimulus, self.net_m_tf.input_target)
 
             # Context networks
             self.recalled_ctx = GatedMemory(self.context_vocab)
@@ -154,15 +160,16 @@ class TCM(spa.Network):
             self.no_learn = nengo.Node(size_in=1)
             nengo.Connection(
                 self.ctrl.output_no_learn, self.no_learn, transform=2.)
-            nengo.Connection(self.no_learn, self.net_m_ft.no_learn)
-            nengo.Connection(self.no_learn, self.net_m_tf.no_learn)
+            nengo.Connection(self.no_learn, self.net_m_ft.input_no_learn)
+            nengo.Connection(self.no_learn, self.net_m_tf.input_no_learn)
 
             nengo.Connection(self.bias, self.no_learn)
             nengo.Connection(self.sim_th.output, self.no_learn, transform=-1)
 
             # Recall
             self.recall = NeuralAccumulatorDecisionProcess(
-                self.item_vocab.create_subset(protocol.get_all_items()))
+                self.item_vocab.create_subset(protocol.get_all_items()),
+                noise=recall_noise)
             self.recall_gate = spa.State(self.item_vocab)
             nengo.Connection(self.current_ctx.output, self.net_m_tf.input_cue)
             nengo.Connection(self.net_m_tf.output, self.recall_gate.input)
@@ -190,12 +197,43 @@ class TCM(spa.Network):
                 nengo.Node(lambda t: 4 if t < 0.3 else 0),
                 self.current_ctx.old.input_store)
 
-            self.output = self.recall.buf.output
+            self.output = self.recall.output
 
         self.outputs = dict(default=(self.output, self.item_vocab))
 
 
 class AssocMatLearning(spa.Network):
+    """Association matrix learning network.
+
+    Will stop learning for a cue-target pair once the cue recalls the target
+    with similarity 1.
+
+    Parameters
+    ----------
+    input_vocab : nengo_spa.Vocabulary or int
+        Input vocabulary.
+    output_vocab : nengo_spa.Vocabulary or int
+        Output vocabulary.
+    init_transform : ndarray
+        Initial transform from input to output (before learning).
+    kwargs : dict
+        Passed on to `nengo_spa.Network`.
+
+    Attributes
+    ----------
+    input_vocab : nengo_spa.Vocabulary
+        Input vocabulary.
+    output_vocab : nengo_spa.Vocabulary
+        Output vocabulary.
+    input_cue : nengo.Node
+        Cue input.
+    input_target : nengo.Node
+        Target to learn.
+    input_no_learn : nengo.Node
+        Inhibits learning with an input of 1.
+    output : nengo.Node
+        Output of associated vector.
+    """
     input_vocab = VocabularyOrDimParam(
         'input_vocab', optional=False, readonly=True)
     output_vocab = VocabularyOrDimParam(
@@ -227,7 +265,7 @@ class AssocMatLearning(spa.Network):
                 conn = nengo.Connection(
                     e, self.output[start:end],
                     learning_rule_type=AML(10.),
-                    function=lambda x, sd=sd: np.zeros(sd),
+                    function=lambda x, sd=sd: np.zeros(sd),  # noqa, pylint: disable=undefined-variable
                     solver=nengo.solvers.LstsqL2(solver=RandomizedSVD()))
                 nengo.Connection(
                     self.target.output[start:end], conn.learning_rule)
@@ -241,18 +279,39 @@ class AssocMatLearning(spa.Network):
                 nengo.Connection(
                     self.state.output, self.output, transform=init_transform)
 
-            self.no_learn = nengo.Node(size_in=1)
+            self.input_no_learn = nengo.Node(size_in=1)
             inhibit_net(self.no_learn, self.target)
 
         self.inputs = {
             'default': (self.input_cue, self.input_vocab),
             'target': (self.input_target, self.output_vocab),
-            'no_learn': (self.no_learn, None)}
+            'no_learn': (self.input_no_learn, None)}
         self.outputs = {'default': (self.output, self.output_vocab)}
 
 
 class Context(spa.Network):
-    """Network to store and update context in TCM fashion."""
+    """Network to store and update context in TCM fashion.
+
+    Parameters
+    ----------
+    beta : float
+        TCM beta parameter, the amount of context drift with each item.
+    vocab : nengo_spa.Vocabulary or int
+        Vocabulary to use.
+    kwargs : dict
+        Passed on to `nengo_spa.Network`.
+
+    Attributes
+    ----------
+    vocab : nengo_spa.Vocabulary
+        Vocabulary to use.
+    input : nengo.Node
+        Input used to update context.
+    input_update_context : nengo.Node
+        Control signal when to update context.
+    output : nengo.Node
+        Output of current context.
+    """
 
     vocab = VocabularyOrDimParam('vocab', optional=False, readonly=True)
 
@@ -287,11 +346,32 @@ class Context(spa.Network):
             nengo.Connection(self.input_update_context, self.old.input_store)
 
         self.output = self.current.output
-        self.inputs = dict(default=(self.input, vocab))
+        self.inputs = dict(default=(self.input, vocab),
+                           update_context=(self.input_update_context, None))
         self.outputs = dict(default=(self.output, vocab))
 
 
 class NeuralAccumulatorDecisionProcess(spa.Network):
+    """Neural independent accumulator decision process for recall.
+
+    Parameters
+    ----------
+    vocab : nengo_spa.Vocabulary or int
+        Vocabulary to use for recallable pointers.
+    noise : float
+        Amount of noise to add to the input.
+    kwargs : dict
+        Passed on to `nengo_spa.Network`.
+
+    Attributes
+    ----------
+    vocab : nengo_spa.Vocabulary
+        Vocabulary to use for recallable pointers.
+    input : nengo.Node
+        Input of retrieved vector.
+    output : nengo.Node
+        Recalled vector.
+    """
     vocab = VocabularyOrDimParam('vocab', optional=False, readonly=True)
 
     def __init__(self, vocab=Default, noise=0., **kwargs):
@@ -304,9 +384,11 @@ class NeuralAccumulatorDecisionProcess(spa.Network):
         with self:
             self.input = nengo.Node(size_in=d)
 
+            # Input rectification
             with nengo.presets.ThresholdingEnsembles(0.):
                 self.inp_thr = nengo.networks.EnsembleArray(50, n_items)
 
+            # Evidence integration
             with nengo.presets.ThresholdingEnsembles(0.):
                 self.state = nengo.networks.EnsembleArray(50, n_items+1)
             nengo.Connection(
@@ -316,6 +398,7 @@ class NeuralAccumulatorDecisionProcess(spa.Network):
                 self.inp_thr.output, self.state.input[:-1], transform=0.1)
             nengo.Connection(self.state.output, self.state.input, synapse=0.1)
 
+            # Thresholding layer
             with nengo.presets.ThresholdingEnsembles(0.8):
                 self.threshold = nengo.networks.EnsembleArray(50, n_items+1)
             nengo.Connection(self.state.output, self.threshold.input)
@@ -327,11 +410,14 @@ class NeuralAccumulatorDecisionProcess(spa.Network):
                     n_items + 1),
                 synapse=0.1)
 
+            # Buffer for recalled item
             self.buf = GatedMemory(self.vocab)
-            self.inhibit = spa.State(self.vocab, feedback=1.)
             nengo.Connection(
                 self.threshold.heaviside[:-1], self.buf.diff.input,
                 transform=self.vocab.vectors.T)
+
+            # Inhibition of recalled items
+            self.inhibit = spa.State(self.vocab, feedback=1.)
             nengo.Connection(
                 self.buf.mem.output, self.inhibit.input, transform=0.1)
             with nengo.presets.ThresholdingEnsembles(0.1):
@@ -342,8 +428,14 @@ class NeuralAccumulatorDecisionProcess(spa.Network):
             nengo.Connection(
                 self.inhib_thr.output, self.state.input[:-1], transform=-1.5)
 
+            # Noise on input
             if noise > 0.:
                 self.noise = nengo.Node(nengo.processes.WhiteNoise(
                     dist=nengo.dists.Gaussian(mean=0., std=0.06 * 0.2)),
-                    size_out=n_items+1)
+                                        size_out=n_items+1)
                 nengo.Connection(self.noise, self.state.input)
+
+            self.output = self.buf.output
+
+        self.inputs = dict(default=(self.input, self.vocab))
+        self.outputs = dict(default=(self.output, self.vocab))

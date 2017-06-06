@@ -12,6 +12,8 @@ from imem import tcm
 
 
 class NeuralTCM(pytry.NengoTrial):
+    # pylint: disable=attribute-defined-outside-init,arguments-differ
+
     PROTOCOLS = {
         'contdist': partial(protocols.FreeRecall, pi=1.2, ipi=16., ri=16.),
         'delayed': partial(protocols.FreeRecall, pi=1.2, ipi=0., ri=16.),
@@ -31,13 +33,14 @@ class NeuralTCM(pytry.NengoTrial):
         self.param("distractor rate", distractor_rate=1.)
         self.param("noise in recall", noise=0.)
         self.param("protocol", protocol='immed')
+        self.param("recall duration", recall_duration=60.)
 
     def model(self, p):
         with spa.Network(seed=p.seed) as model:
             model.config[spa.State].represent_identity = False
 
             proto = self.get_proto(p)
-            model.tcm = tcm.TCM(p.beta, proto, p.item_d, p.context_d)
+            model.tcm = tcm.TCM(p.beta, proto, p.noise, p.item_d, p.context_d)
             self.p_recalls = nengo.Probe(model.tcm.output, synapse=0.01)
 
         self._model = model
@@ -46,7 +49,7 @@ class NeuralTCM(pytry.NengoTrial):
     def evaluate(self, p, sim, plt):
         proto = self.get_proto(p)
 
-        sim.run(proto.duration + 60.)
+        sim.run(proto.duration + p.recall_duration)
 
         recall_vocab = self._model.tcm.item_vocab.create_subset(
             proto.get_all_items())
