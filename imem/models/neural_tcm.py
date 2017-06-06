@@ -60,6 +60,6 @@ class NeuralTCM(pytry.NengoTrial):
 
         return {
             'responses': responses,
-            'vocab_vectors': self.control.vocab.vectors,
-            'vocab_keys': list(self.control.vocab.keys()),
+            'vocab_vectors': self._model.tcm.item_vocab.vectors,
+            'vocab_keys': list(self._model.tcm.item_vocab.keys()),
         }
