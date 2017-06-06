@@ -80,7 +80,7 @@ def AlternatingMemoryBuffers(d, beta, **kwargs):
         nengo.Connection(net.new_ctx, net.dot.input_a)
         nengo.Connection(net.current.output, net.dot.input_b)
         nengo.Connection(net.dot.output, net.update_done)
-        nengo.Connection(net.update_done_th, net.current.store)
+        nengo.Connection(net.update_done_th, net.current.input_store)
 
         nengo.Connection(net.current.output, net.old.input)
         nengo.Connection(
@@ -91,7 +91,7 @@ def AlternatingMemoryBuffers(d, beta, **kwargs):
         nengo.Connection(
             net.update_done_th, net.invert.neurons,
             transform=-3 * np.ones((net.invert.n_neurons, 1)))
-        nengo.Connection(net.invert, net.old.store)
+        nengo.Connection(net.invert, net.old.input_store)
 
         net.output = net.current.output
 
@@ -129,10 +129,10 @@ def ThreeMemory(d, beta, **kwargs):
             net.update_done, net.update_done_th, synapse=None,
             function=lambda x: 1 if x >= 0.0 else 0)
 
-        nengo.Connection(net.update_done_th, net.current.store)
-        nengo.Connection(net.update_done_th, net.old.store)
-        nengo.Connection(net.bias, net.buf.store)
-        nengo.Connection(net.update_done_th, net.buf.store, transform=-1)
+        nengo.Connection(net.update_done_th, net.current.input_store)
+        nengo.Connection(net.update_done_th, net.old.input_store)
+        nengo.Connection(net.bias, net.buf.input_store)
+        nengo.Connection(net.update_done_th, net.buf.input_store, transform=-1)
 
         net.output = net.current.mem.output
 
@@ -159,16 +159,16 @@ def Context4(d, beta, **kwargs):
         net.bias = nengo.Node(1)
         net.input_update_context = nengo.Node(size_in=1)
 
-        nengo.Connection(net.bias, net.current.store)
-        nengo.Connection(net.bias, net.old.store)
+        nengo.Connection(net.bias, net.current.input_store)
+        nengo.Connection(net.bias, net.old.input_store)
         nengo.Connection(
-            net.input_update_context, net.current.store, transform=-1.,
+            net.input_update_context, net.current.input_store, transform=-1.,
             synapse=None)
         nengo.Connection(
-            net.input_update_context, net.old.store, transform=-1.,
+            net.input_update_context, net.old.input_store, transform=-1.,
             synapse=None)
 
-        nengo.Connection(net.input_update_context, net.buf.store)
+        nengo.Connection(net.input_update_context, net.buf.input_store)
 
         # net.downscale = spa.State(d)
         # nengo.Connection(net.buf.mem.output, net.downscale.input)
@@ -207,12 +207,12 @@ def Context5(d, beta, **kwargs):
         net.bias = nengo.Node(1)
         net.input_update_context = nengo.Node(size_in=1)
 
-        nengo.Connection(net.bias, net.current.store)
+        nengo.Connection(net.bias, net.current.input_store)
         nengo.Connection(
-            net.input_update_context, net.current.store, transform=-1.,
+            net.input_update_context, net.current.input_store, transform=-1.,
             synapse=None)
 
-        nengo.Connection(net.input_update_context, net.old.store)
+        nengo.Connection(net.input_update_context, net.old.input_store)
 
         # net.downscale = spa.State(d)
         # nengo.Connection(net.buf.mem.output, net.downscale.input)

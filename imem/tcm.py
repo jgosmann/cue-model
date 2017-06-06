@@ -14,14 +14,33 @@ from imem.utils.nengo import inhibit_net
 
 
 class Control(nengo.Network):
+    """Non-neural control signals for the TCM model.
+
+    Parameters
+    ----------
+    protocol : FreeRecall
+        Definition of experimental protocol.
+    item_d : int
+        Dimensionality of item vectors.
+    distractor_rate : float
+        Rate of distractors.
+    rng : numpy.random.RandomState
+        Random number generator for initializing the item vocabulary.
+
+    Attributes
+    ----------
+    item_vocab : nengo_spa.Vocabulary
+        Item vocabulary.
+
+    """
     def __init__(self, protocol, item_d, distractor_rate, rng=np.random):
         super(Control, self).__init__(label="Control")
         self.protocol = protocol
         self.next_recall = 0
 
-        self.vocab = spa.Vocabulary(item_d, rng=rng, strict=False)
+        self.item_vocab = spa.Vocabulary(item_d, rng=rng, strict=False)
         for i in range(self.protocol.n_items):
-            self.vocab.add('V' + str(i), self.vocab.create_pointer())
+            self.item_vocab.add('V' + str(i), self.item_vocab.create_pointer())
 
         self.responses = []
         self.response_times = []
@@ -46,13 +65,13 @@ class Control(nengo.Network):
             def store_current_stim(t):
                 if self.protocol.is_pres_phase:
                     self.current_stim = stimulus_fn(t)
-                    return self.vocab.parse(self.current_stim).v
+                    return self.item_vocab.parse(self.current_stim).v
                 else:
                     return np.zeros(item_d)
             self.stimulus = nengo.Node(store_current_stim)
 
     def _handle_response(self, t, x):
-        dots = np.dot(self.vocab.vectors, x)
+        dots = np.dot(self.item_vocab.vectors, x)
         idx = np.argmax(dots)
         if dots[idx] < 0.8:
             return dots[idx]
@@ -65,8 +84,8 @@ class Control(nengo.Network):
 
     def _recalled_list(self, t):
         if len(self.responses) <= 0:
-            return np.zeros(self.vocab.dimensions)
-        v = np.sum(self.vocab.vectors[self.responses], axis=0)
+            return np.zeros(self.item_vocab.dimensions)
+        v = np.sum(self.item_vocab.vectors[self.responses], axis=0)
         v /= np.linalg.norm(v)
         return v
 
@@ -156,7 +175,7 @@ class TCM(spa.Network):
             nengo.Connection(ctx_init, self.current_ctx.current.input)
             nengo.Connection(
                 nengo.Node(lambda t: 4 if t < 0.3 else 0),
-                self.current_ctx.old.store)
+                self.current_ctx.old.input_store)
 
 
 class AssocMatLearning(spa.Network):
@@ -244,12 +263,12 @@ class Context(spa.Network):
             self.bias = nengo.Node(1)
             self.input_update_context = nengo.Node(size_in=1)
 
-            nengo.Connection(self.bias, self.current.store)
+            nengo.Connection(self.bias, self.current.input_store)
             nengo.Connection(
-                self.input_update_context, self.current.store, transform=-1.,
-                synapse=None)
+                self.input_update_context, self.current.input_store,
+                transform=-1., synapse=None)
 
-            nengo.Connection(self.input_update_context, self.old.store)
+            nengo.Connection(self.input_update_context, self.old.input_store)
 
         self.output = self.current.output
         self.inputs = dict(default=(self.input, vocab))

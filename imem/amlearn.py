@@ -1,3 +1,5 @@
+"""Association matrix learning rule (AML)."""
+
 import nengo
 from nengo.builder.connection import get_eval_points, solve_for_decoders
 from nengo.builder.operator import Reset
@@ -8,6 +10,11 @@ import numpy as np
 
 
 class AML(nengo.learning_rules.LearningRuleType, SupportDefaultsMixin):
+    """Association matrix learning rule (AML).
+
+    Error is used as target vector and the pre-synaptic ensemble provides the
+    cue vector.
+    """
     error_type = 'decoded'
     modifies = 'decoders'
     seed = IntParam('seed', default=None, optional=True, readonly=True)
