@@ -280,7 +280,7 @@ class AssocMatLearning(spa.Network):
                     self.state.output, self.output, transform=init_transform)
 
             self.input_no_learn = nengo.Node(size_in=1)
-            inhibit_net(self.no_learn, self.target)
+            inhibit_net(self.input_no_learn, self.target)
 
         self.inputs = {
             'default': (self.input_cue, self.input_vocab),
