@@ -34,6 +34,7 @@ class NeuralTCM(pytry.NengoTrial):
         self.param("noise in recall", noise=0.)
         self.param("protocol", protocol='immed')
         self.param("recall duration", recall_duration=60.)
+        self.param("save debug data", debug=False)
 
     def model(self, p):
         with spa.Network(seed=p.seed) as model:
@@ -61,8 +62,11 @@ class NeuralTCM(pytry.NengoTrial):
                 responses.append(float(x))
         responses = responses + (p.n_items - len(responses)) * [np.nan]
 
-        return {
+        result = {
             'responses': responses,
             'vocab_vectors': self._model.tcm.item_vocab.vectors,
             'vocab_keys': list(self._model.tcm.item_vocab.keys()),
         }
+        if p.debug:
+            np.savez('debug.npz', **result)
+        return result
