@@ -1,16 +1,16 @@
 from __future__ import absolute_import, print_function
 
-import numpy as np
-
 import nengo
 from nengo.config import Default
 from nengo.utils.compat import is_integer
 from nengo.utils.least_squares_solvers import RandomizedSVD
 import nengo_spa as spa
 from nengo_spa.vocab import VocabularyOrDimParam
+import numpy as np
 
 from imem.amlearn import AML
 from imem.modules import GatedMemory, SimilarityThreshold
+from imem.networks import OneHotCounter
 from imem.utils.nengo import inhibit_net
 
 
@@ -156,6 +156,27 @@ class TCM(spa.Network):
                 self.ctrl.output_stimulus, self.last_item.input, transform=1.,
                 synapse=0.1)
 
+            # position counter (FIXME move out of TCM?)
+            self.pos = OneHotCounter(15)
+            nengo.Connection(self.sim_th.output, self.pos.input_inc,
+                             transform=-1)
+            nengo.Connection(nengo.Node(lambda t: t < 0.3), self.pos.input[0])
+            d = self.item_vocab.dimensions
+            projection = np.random.randn(d, d)
+            for i in range(1, d):
+                y = -np.dot(projection[:i, i:], projection[i, i:])
+                A = projection[:i, :i]
+                projection[i, :i] = np.linalg.solve(A, y)
+            projection /= np.linalg.norm(projection, axis=1)[:, None]
+            pos_vocab = spa.Vocabulary(d)
+            for i in range(15):
+                pos_vocab.add('P' + str(i), projection[:, i])
+            tr = pos_vocab.vectors.T
+            nengo.Connection(self.pos.output, self.net_m_ft.input_cue,
+                             transform=tr)
+            nengo.Connection(self.pos.output, self.net_m_tf.input_target,
+                             transform=tr)
+
             # Control of learning
             self.no_learn = nengo.Node(size_in=1)
             nengo.Connection(
@@ -186,6 +207,19 @@ class TCM(spa.Network):
             nengo.Connection(self.recall.buf.output, self.sim_th.input_a)
             nengo.Connection(
                 self.recall.buf.output, self.last_item.input, synapse=0.1)
+
+            self.pos_recall = NeuralAccumulatorDecisionProcess(
+                pos_vocab,
+                noise=recall_noise)
+            nengo.Connection(self.recall_gate.output, self.pos_recall.input)
+            nengo.Connection(
+                self.pos_recall.buf.mem.output, self.net_m_ft.input_cue)
+
+            inhibit_net(
+                self.ctrl.output_pres_phase, self.pos_recall.buf.mem,
+                strength=6)
+            inhibit_net(self.ctrl.output_pres_phase, self.pos_recall.state)
+            inhibit_net(self.ctrl.output_pres_phase, self.pos_recall.inhibit)
 
             # Initialization of context
             initial_ctx = self.context_vocab.create_pointer().v

@@ -18,6 +18,8 @@ class GatedMemory(spa.Network):
     ----------
     vocab : nengo_spa.Vocabulary or int
         Vocabulary.
+    feedback : float
+        Feedback connection strength.
     feedback_syn : float
         Synaptic time constant of the feedback connection.
 
@@ -35,14 +37,14 @@ class GatedMemory(spa.Network):
 
     vocab = VocabularyOrDimParam('vocab', optional=False, readonly=True)
 
-    def __init__(self, vocab=Default, feedback_syn=.1, **kwargs):
+    def __init__(self, vocab=Default, feedback=1., feedback_syn=.1, **kwargs):
         super(GatedMemory, self).__init__(**kwargs)
 
         self.vocab = vocab
 
         with self:
             self.diff = spa.State(self.vocab)
-            self.mem = spa.State(self.vocab, feedback=1)
+            self.mem = spa.State(self.vocab, feedback=feedback)
             self.input_store = nengo.Node(size_in=1)
 
             nengo.Connection(
