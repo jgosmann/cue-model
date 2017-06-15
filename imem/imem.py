@@ -173,6 +173,21 @@ class IMem(spa.Network):
             nengo.Connection(self.pos.output, self.tcm.input_pos,
                              transform=self.task_vocabs.positions.vectors.T)
 
+            # Reset of position
+            with nengo.presets.ThresholdingEnsembles(0.):
+                self.start_of_recall = nengo.Ensemble(50, 1)
+            nengo.Connection(
+                self.ctrl.output_recall_phase, self.start_of_recall,
+                synapse=0.05, transform=-1)
+            nengo.Connection(
+                self.ctrl.output_recall_phase, self.start_of_recall,
+                synapse=0.005)
+            tr = -6 * np.ones((self.pos.input.size_in, 1))
+            tr[0, 0] = 3.
+            nengo.Connection(
+                self.start_of_recall, self.pos.input, transform=tr,
+                synapse=0.1)
+
             self.ose = OSE(self.task_vocabs.items, gamma)
             nengo.Connection(self.ctrl.output_stimulus, self.ose.input_item)
             nengo.Connection(self.pos.output, self.ose.input_pos,
