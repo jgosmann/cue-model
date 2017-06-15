@@ -8,11 +8,10 @@ import numpy as np
 import pytry
 
 from imem import protocols
-from imem import tcm
-from imem.imem import Control, Vocabularies
+from imem.imem import IMem, Vocabularies
 
 
-class NeuralTCM(pytry.NengoTrial):
+class IMemTrial(pytry.NengoTrial):
     # pylint: disable=attribute-defined-outside-init,arguments-differ
 
     PROTOCOLS = {
@@ -31,6 +30,7 @@ class NeuralTCM(pytry.NengoTrial):
         self.param("item dimensionality", item_d=256)
         self.param("context dimensionality", context_d=256)
         self.param("contextual drift rate", beta=0.62676)
+        self.param("OSE memory decay", gamma=0.9775)
         self.param("distractor rate", distractor_rate=1.)
         self.param("noise in recall", noise=0.)
         self.param("protocol", protocol='immed')
@@ -38,15 +38,31 @@ class NeuralTCM(pytry.NengoTrial):
 
     def model(self, p):
         proto = self.get_proto(p)
-        self.vocabs = Vocabularies(proto, p.item_d, p.context_d, 0)
+        self.vocabs = Vocabularies(proto, p.item_d, p.context_d, p.n_items)
 
         with spa.Network(seed=p.seed) as model:
             model.config[spa.State].represent_identity = False
 
-            model.control = Control(proto, self.vocabs.items)
-            model.tcm = tcm.TCM(
-                self.vocabs, proto, model.control, p.beta, p.noise)
-            self.p_recalls = nengo.Probe(model.tcm.output, synapse=0.01)
+            model.imem = IMem(proto, self.vocabs, p.beta, p.gamma, p.noise)
+            self.p_recalls = nengo.Probe(model.imem.output, synapse=0.01)
+
+            self.p_ose = nengo.Probe(model.imem.ose.output, synapse=0.01)
+            self.p_ose_store = nengo.Probe(
+                model.imem.ose.input_store, synapse=0.01)
+            self.p_input_item = nengo.Probe(
+                model.imem.ose.input_item, synapse=0.01)
+            self.p_input_pos = nengo.Probe(
+                model.imem.ose.input_pos, synapse=0.01)
+            self.p_g1 = nengo.Probe(
+                model.imem.ose.combine.diff.output, synapse=0.01)
+            self.p_g2 = nengo.Probe(
+                model.imem.ose.mem.diff.output, synapse=0.01)
+            self.p_combine = nengo.Probe(
+                model.imem.ose.combine.output, synapse=0.01)
+            self.p_pos = nengo.Probe(model.imem.pos.output, synapse=0.01)
+            self.p_bind = nengo.Probe(model.imem.ose.bind.output, synapse=0.01)
+            self.p_bind_a = nengo.Probe(model.imem.ose.bind.input_a, synapse=0.01)
+            self.p_bind_b = nengo.Probe(model.imem.ose.bind.input_b, synapse=0.01)
 
         return model
 
@@ -68,5 +84,20 @@ class NeuralTCM(pytry.NengoTrial):
             'responses': responses,
             'vocab_vectors': self.vocabs.items.vectors,
             'vocab_keys': list(self.vocabs.items.keys()),
+            'pos_vectors': self.vocabs.positions.vectors,
+            'pos_keys': list(self.vocabs.positions.keys()),
+            'ose': sim.data[self.p_ose],
+            'ose_store': sim.data[self.p_ose_store],
+            'input_item': sim.data[self.p_input_item],
+            'input_pos': sim.data[self.p_input_pos],
+            'g1': sim.data[self.p_g1],
+            'g2': sim.data[self.p_g2],
+            'combine': sim.data[self.p_combine],
+            'pos': sim.data[self.p_pos],
+            'bind': sim.data[self.p_bind],
+            'bind_a': sim.data[self.p_bind_a],
+            'bind_b': sim.data[self.p_bind_b],
         }
+        # if p.debug:
+            # np.savez('debug.npz', **result)
         return result

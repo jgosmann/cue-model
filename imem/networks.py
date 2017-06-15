@@ -16,10 +16,10 @@ def OneHotCounter(n, **kwargs):
             net.state.output, net.state.input, synapse=0.1, transform=2.)
         nengo.Connection(
             net.state.output, net.state.input,
-            transform=0.2 * np.roll(np.eye(n), 1, axis=1))
+            transform=0.2 * np.roll(np.eye(n), -1, axis=1))
         nengo.Connection(
             net.state.output, net.state.input,
-            transform=-np.roll(np.eye(n), -1, axis=1))
+            transform=-np.roll(np.eye(n), 1, axis=1))
 
         net.input_inc = nengo.Node(size_in=1)
         nengo.Connection(net.input_inc, net.rising_edge_detector, synapse=0.05,
