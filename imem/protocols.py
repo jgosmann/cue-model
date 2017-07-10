@@ -1,8 +1,8 @@
 import numpy as np
 
 
-class FreeRecall(object):
-    """Free recall protocoll.
+class Recall(object):
+    """Recall protocoll.
 
     Parameters
     ----------
@@ -16,13 +16,16 @@ class FreeRecall(object):
         Retention interval.
     distractor_rate : float
         Rate of distractors in items per second.
+    serial : bool
+        Indicates serial vs free recall.
     """
-    def __init__(self, n_items, pi, ipi, ri, distractor_rate):
+    def __init__(self, n_items, pi, ipi, ri, distractor_rate, serial=False):
         self.n_items = n_items
         self.pi = pi
         self.ipi = ipi
         self.ri = ri
         self.distractor_rate = distractor_rate
+        self.serial = serial
         self.pres_phase_duration = (
             self.n_items * self.pi + (self.n_items - 1) * self.ipi)
         self.duration = self.pres_phase_duration + self.ri

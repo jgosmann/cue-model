@@ -16,9 +16,9 @@ class NeuralTCM(pytry.NengoTrial):
     # pylint: disable=attribute-defined-outside-init,arguments-differ
 
     PROTOCOLS = {
-        'contdist': partial(protocols.FreeRecall, pi=1.2, ipi=16., ri=16.),
-        'delayed': partial(protocols.FreeRecall, pi=1.2, ipi=0., ri=16.),
-        'immed': partial(protocols.FreeRecall, pi=1., ipi=0., ri=0.),
+        'contdist': partial(protocols.Recall, pi=1.2, ipi=16., ri=16.),
+        'delayed': partial(protocols.Recall, pi=1.2, ipi=0., ri=16.),
+        'immed': partial(protocols.Recall, pi=1., ipi=0., ri=0.),
     }
 
     @classmethod

@@ -19,7 +19,7 @@ class TCM(spa.Network):
     ----------
     beta : float
         TCM beta parameter, the amount of context drift with each item.
-    protocol : FreeRecall
+    protocol : Recall
         Experimental protocol.
     recall_noise : float
         Standard deviation of Gaussian noise to add in recall.
@@ -68,8 +68,12 @@ class TCM(spa.Network):
             # Position input
             self.input_pos = nengo.Node(
                 size_in=self.task_vocabs.positions.dimensions)
-            nengo.Connection(self.input_pos, self.net_m_ft.input_cue)
-            nengo.Connection(self.input_pos, self.net_m_tf.input_target)
+            self.posv = spa.State(self.task_vocabs.positions)
+            nengo.Connection(self.input_pos, self.posv.input)
+            nengo.Connection(self.posv.output, self.net_m_ft.input_cue)
+            inhibit_net(self.ctrl.output_free_recall, self.posv)
+            nengo.Connection(
+                self.input_pos, self.net_m_tf.input_target, transform=1.)  # HERE too
 
             # Context networks
             self.recalled_ctx = GatedMemory(self.task_vocabs.contexts)
@@ -113,6 +117,7 @@ class TCM(spa.Network):
             nengo.Connection(self.recall_gate.output, self.recall.input)
             nengo.Connection(
                 self.recall.buf.mem.output, self.net_m_ft.input_cue)
+            # FIXME
 
             inhibit_net(self.ctrl.output_pres_phase, self.recall_gate)
             inhibit_net(
@@ -131,6 +136,9 @@ class TCM(spa.Network):
                     self.recall_gate.output, self.pos_recall.input)
                 nengo.Connection(
                     self.pos_recall.buf.mem.output, self.net_m_ft.input_cue)
+                # FIXME
+                inhibit_net(
+                    self.ctrl.output_serial_recall, self.pos_recall.buf)
 
                 inhibit_net(
                     self.ctrl.output_pres_phase, self.pos_recall.buf.mem,
@@ -138,6 +146,12 @@ class TCM(spa.Network):
                 inhibit_net(self.ctrl.output_pres_phase, self.pos_recall.state)
                 inhibit_net(
                     self.ctrl.output_pres_phase, self.pos_recall.inhibit)
+
+                nengo.Connection(
+                    self.pos_recall.buf.output, self.sim_th.input_a)
+                nengo.Connection(
+                    self.pos_recall.buf.output, self.last_item.input,
+                    synapse=0.1)
 
             # Initialization of context
             initial_ctx = self.task_vocabs.contexts.create_pointer().v
@@ -354,6 +368,8 @@ class NeuralAccumulatorDecisionProcess(spa.Network):
                 synapse=None)
             nengo.Connection(
                 self.inp_thr.output, self.state.input[:-1], transform=0.1)
+            nengo.Connection(
+                nengo.Node(1.), self.state.input[-1], transform=0.0)  # HERE
             nengo.Connection(self.state.output, self.state.input, synapse=0.1)
 
             # Thresholding layer
@@ -389,7 +405,7 @@ class NeuralAccumulatorDecisionProcess(spa.Network):
             # Noise on input
             if noise > 0.:
                 self.noise = nengo.Node(nengo.processes.WhiteNoise(
-                    dist=nengo.dists.Gaussian(mean=0., std=0.06 * 0.2)),
+                    dist=nengo.dists.Gaussian(mean=0., std=noise)),
                                         size_out=n_items+1)
                 nengo.Connection(self.noise, self.state.input)
 

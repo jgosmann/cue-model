@@ -15,9 +15,10 @@ class IMemTrial(pytry.NengoTrial):
     # pylint: disable=attribute-defined-outside-init,arguments-differ
 
     PROTOCOLS = {
-        'contdist': partial(protocols.FreeRecall, pi=1.2, ipi=16., ri=16.),
-        'delayed': partial(protocols.FreeRecall, pi=1.2, ipi=0., ri=16.),
-        'immed': partial(protocols.FreeRecall, pi=1., ipi=0., ri=0.),
+        'contdist': partial(protocols.Recall, pi=1.2, ipi=16., ri=16.),
+        'delayed': partial(protocols.Recall, pi=1.2, ipi=0., ri=16.),
+        'immed': partial(protocols.Recall, pi=1., ipi=0., ri=0.),
+        'serial': partial(protocols.Recall, pi=1., ipi=0., ri=0., serial=True),
     }
 
     @classmethod
@@ -38,7 +39,7 @@ class IMemTrial(pytry.NengoTrial):
 
     def model(self, p):
         proto = self.get_proto(p)
-        self.vocabs = Vocabularies(proto, p.item_d, p.context_d, p.n_items)
+        self.vocabs = Vocabularies(proto, p.item_d, p.context_d, p.n_items + 3)
 
         with spa.Network(seed=p.seed) as model:
             model.config[spa.State].represent_identity = False
@@ -46,7 +47,7 @@ class IMemTrial(pytry.NengoTrial):
             model.imem = IMem(proto, self.vocabs, p.beta, p.gamma, p.noise)
             self.p_recalls = nengo.Probe(model.imem.output, synapse=0.01)
 
-            self.p_ose = nengo.Probe(model.imem.ose.output, synapse=0.01)
+            # self.p_ose = nengo.Probe(model.imem.ose.output, synapse=0.01)
             self.p_ose_store = nengo.Probe(
                 model.imem.ose.input_store, synapse=0.01)
             self.p_input_item = nengo.Probe(
@@ -86,7 +87,7 @@ class IMemTrial(pytry.NengoTrial):
             'vocab_keys': list(self.vocabs.items.keys()),
             'pos_vectors': self.vocabs.positions.vectors,
             'pos_keys': list(self.vocabs.positions.keys()),
-            'ose': sim.data[self.p_ose],
+            # 'ose': sim.data[self.p_ose],
             'ose_store': sim.data[self.p_ose_store],
             'input_item': sim.data[self.p_input_item],
             'input_pos': sim.data[self.p_input_pos],
