@@ -135,11 +135,11 @@ class TCM(spa.Network):
                 nengo.Connection(
                     self.recall_gate.output, self.pos_recall.input)
                 nengo.Connection(
-                    self.pos_recall.buf.mem.output, self.net_m_ft.input_cue,
-                    transform=np.dot(
-                        np.roll(
-                            self.task_vocabs.positions.vectors, -1, axis=0).T,
-                        self.task_vocabs.positions.vectors))
+                    self.pos_recall.buf.mem.output, self.net_m_ft.input_cue)
+                    # transform=np.dot(
+                        # np.roll(
+                            # self.task_vocabs.positions.vectors, -1, axis=0).T,
+                        # self.task_vocabs.positions.vectors))
                 # FIXME
                 inhibit_net(
                     self.ctrl.output_serial_recall, self.pos_recall.buf)
