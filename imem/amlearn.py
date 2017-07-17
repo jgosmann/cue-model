@@ -20,7 +20,7 @@ class AML(nengo.learning_rules.LearningRuleType, SupportDefaultsMixin):
     seed = IntParam('seed', default=None, optional=True, readonly=True)
 
     def __init__(self, learning_rate=1., seed=Default):
-        super(AML, self).__init__(learning_rate)
+        super(AML, self).__init__(learning_rate, size_in='post')
         self.seed = seed
 
 
@@ -91,7 +91,7 @@ def build_aml(model, aml, rule):
     x = np.dot(eval_points, encoders.T)
 
     base_decoders, _ = solve_for_decoders(
-        conn.solver, conn.pre_obj.neuron_type, gain, bias, x, targets, rng=rng)
+        conn, gain, bias, x, targets, rng=rng)
 
     model.add_op(SimAML(
         aml.learning_rate, base_decoders, pre, error, decoders))
