@@ -72,8 +72,7 @@ class TCM(spa.Network):
             nengo.Connection(self.input_pos, self.posv.input)
             nengo.Connection(self.posv.output, self.net_m_ft.input_cue)
             inhibit_net(self.ctrl.output_free_recall, self.posv)
-            nengo.Connection(
-                self.input_pos, self.net_m_tf.input_target, transform=1.)  # HERE too
+            nengo.Connection(self.input_pos, self.net_m_tf.input_target)
 
             # Context networks
             self.recalled_ctx = GatedMemory(self.task_vocabs.contexts)
@@ -117,7 +116,6 @@ class TCM(spa.Network):
             nengo.Connection(self.recall_gate.output, self.recall.input)
             nengo.Connection(
                 self.recall.buf.mem.output, self.net_m_ft.input_cue)
-            # FIXME
 
             inhibit_net(self.ctrl.output_pres_phase, self.recall_gate)
             inhibit_net(
@@ -136,11 +134,6 @@ class TCM(spa.Network):
                     self.recall_gate.output, self.pos_recall.input)
                 nengo.Connection(
                     self.pos_recall.buf.mem.output, self.net_m_ft.input_cue)
-                    # transform=np.dot(
-                        # np.roll(
-                            # self.task_vocabs.positions.vectors, -1, axis=0).T,
-                        # self.task_vocabs.positions.vectors))
-                # FIXME
                 inhibit_net(
                     self.ctrl.output_serial_recall, self.pos_recall.buf)
 
