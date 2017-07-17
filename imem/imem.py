@@ -149,10 +149,6 @@ class OSE(spa.Network):
                 self.recall = spa.Bind(self.vocab, invert_a=True)
                 nengo.Connection(self.input_pos, self.recall.input_a)
                 nengo.Connection(self.mem.output, self.recall.input_b)
-                # self.cleanup = spa.ThresholdingAssocMem(
-                    # threshold=0.3, input_vocab=self.vocab)
-                # nengo.Connection(self.recall.output, self.cleanup.input)
-                # self.output = self.cleanup.output
                 self.output = self.recall.output
                 self.outputs = dict(default=(self.output, self.vocab))
 
@@ -206,6 +202,7 @@ class IMem(spa.Network):
                     self.task_vocabs.positions.vectors[0]).T,
                 synapse=0.1)
 
+            # Set position from recalled positions
             self.pos_gate = nengo.networks.EnsembleArray(
                 30, len(self.task_vocabs.positions))
             nengo.Connection(
@@ -216,7 +213,8 @@ class IMem(spa.Network):
                 self.bias, self.pos_gate.input,
                 transform=-np.ones((self.pos_gate.input.size_in, 1)))
             nengo.Connection(
-                self.pos_gate.output, self.pos.input, transform=10., synapse=0.1)
+                self.pos_gate.output, self.pos.input, transform=10.,
+                synapse=0.1)
             self.invert = nengo.Ensemble(30, 1)
             nengo.Connection(self.bias, self.invert)
             nengo.Connection(
@@ -226,20 +224,21 @@ class IMem(spa.Network):
                 transform=-np.ones((1, self.task_vocabs.positions.dimensions)))
             inhibit_net(self.invert, self.pos_gate)
 
+            # Short term memory
             self.ose = OSE(
-                self.task_vocabs.items, gamma, recall=True)#protocol.serial)
+                self.task_vocabs.items, gamma, recall=True)
             nengo.Connection(self.ctrl.output_stimulus, self.ose.input_item)
             nengo.Connection(self.pos.output, self.ose.input_pos,
                              transform=self.task_vocabs.positions.vectors.T)
             nengo.Connection(self.tcm.output_stim_update_done,
                              self.ose.input_store)
-            # if protocol.serial:
+
+            # Short term recall
             self.ose_recall_gate = spa.State(self.task_vocabs.items)
             nengo.Connection(self.ose.output, self.ose_recall_gate.input)
             nengo.Connection(
                 self.ose_recall_gate.output, self.tcm.recall.input)
             inhibit_net(self.ctrl.output_pres_phase, self.ose_recall_gate)
-            # FIXME additions
             inhibit_net(self.start_of_recall, self.ose_recall_gate)
             inhibit_net(self.start_of_recall, self.tcm.current_ctx.old.mem,
                         synapse=0.1, strength=5)
