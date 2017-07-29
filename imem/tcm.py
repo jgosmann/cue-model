@@ -72,7 +72,8 @@ class TCM(spa.Network):
             nengo.Connection(self.input_pos, self.posv.input)
             nengo.Connection(self.posv.output, self.net_m_ft.input_cue)
             inhibit_net(self.ctrl.output_free_recall, self.posv)
-            nengo.Connection(self.input_pos, self.net_m_tf.input_target)
+            nengo.Connection(
+                self.posv.output, self.net_m_tf.input_target, transform=1.)  # HERE too
 
             # Context networks
             self.recalled_ctx = GatedMemory(self.task_vocabs.contexts)
