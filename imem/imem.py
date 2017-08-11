@@ -35,6 +35,8 @@ class Control(nengo.Network):
         Outputs 1 during the recall phase, 0 otherwise.
     output_no_learn : nengo.Node
         Outputs 1 when learning should be disabled.
+    output_learn : nengo.Ensemble
+        Outputs 1 when learning should be enabled.
     output_stimulus : nengo.Node
         Outputs current stimulus.
     """
@@ -59,6 +61,12 @@ class Control(nengo.Network):
                            self._current_stim is None or
                            self._current_stim.startswith('D')),
                 label='output_no_learn')
+            self.bias = nengo.Node(1.)
+            self.output_learn = nengo.Ensemble(
+                25, 1, encoders=nengo.dists.Choice([[1.]]))
+            nengo.Connection(self.bias, self.output_learn)
+            nengo.Connection(
+                self.output_no_learn, self.output_learn, transform=-1.)
 
             stimulus_fn = self.protocol.make_stimulus_fn()
 
@@ -178,9 +186,22 @@ class IMem(spa.Network):
             self.pos = OneHotCounter(len(self.task_vocabs.positions))
             nengo.Connection(self.tcm.output_stim_update_done,
                              self.pos.input_inc, transform=-1)
+            nengo.Connection(
+                self.ctrl.output_no_learn, self.pos.input_inc, transform=-2.)
             nengo.Connection(nengo.Node(lambda t: t < 0.3), self.pos.input[0])
-            nengo.Connection(self.pos.output, self.tcm.input_pos,
+
+            self.in_pos_gate = spa.State(self.task_vocabs.positions)
+            nengo.Connection(self.pos.output, self.in_pos_gate.input,
                              transform=self.task_vocabs.positions.vectors.T)
+            nengo.Connection(self.in_pos_gate.output, self.tcm.input_pos)
+            self.irrelevant_pos_gate = spa.State(self.task_vocabs.positions)
+            self.irrelevant_pos = nengo.Node(
+                self.task_vocabs.positions.create_pointer())
+            nengo.Connection(self.irrelevant_pos,
+                             self.irrelevant_pos_gate.input)
+            inhibit_net(self.ctrl.output_no_learn, self.in_pos_gate)
+            inhibit_net(self.ctrl.output_learn, self.irrelevant_pos_gate)
+            nengo.Connection(self.irrelevant_pos_gate, self.tcm.input_pos)
 
             # Reset of position
             with nengo.presets.ThresholdingEnsembles(0.):
@@ -228,8 +249,9 @@ class IMem(spa.Network):
             self.ose = OSE(
                 self.task_vocabs.items, gamma, recall=True)
             nengo.Connection(self.ctrl.output_stimulus, self.ose.input_item)
-            nengo.Connection(self.pos.output, self.ose.input_pos,
-                             transform=self.task_vocabs.positions.vectors.T)
+            nengo.Connection(self.in_pos_gate.output, self.ose.input_pos)
+            nengo.Connection(
+                self.irrelevant_pos_gate.output, self.ose.input_pos)
             nengo.Connection(self.tcm.output_stim_update_done,
                              self.ose.input_store)
 
