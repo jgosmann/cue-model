@@ -187,7 +187,8 @@ class IMem(spa.Network):
             nengo.Connection(self.tcm.output_stim_update_done,
                              self.pos.input_inc, transform=-1)
             nengo.Connection(
-                self.ctrl.output_no_learn, self.pos.input_inc, transform=-2.)
+                self.ctrl.output_no_learn, self.pos.rising_edge_gate,
+                transform=-1.)
             nengo.Connection(nengo.Node(lambda t: t < 0.3), self.pos.input[0])
 
             self.in_pos_gate = spa.State(self.task_vocabs.positions)
