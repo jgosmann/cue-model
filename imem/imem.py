@@ -61,6 +61,14 @@ class Control(nengo.Network):
                            self._current_stim is None or
                            self._current_stim.startswith('D')),
                 label='output_no_learn')
+            self.output_no_pos_count = nengo.Node(
+                lambda t: (self.protocol.is_recall_phase(t) or
+                           self._current_stim is None or
+                           self._current_stim.startswith('D')) and
+                not protocol.serial,
+                label='output_no_learn')
+
+
             self.bias = nengo.Node(1.)
             self.output_learn = nengo.Ensemble(
                 25, 1, encoders=nengo.dists.Choice([[1.]]))
@@ -187,7 +195,7 @@ class IMem(spa.Network):
             nengo.Connection(self.tcm.output_stim_update_done,
                              self.pos.input_inc, transform=-1)
             nengo.Connection(
-                self.ctrl.output_no_learn, self.pos.rising_edge_gate,
+                self.ctrl.output_no_pos_count, self.pos.rising_edge_gate,
                 transform=-1.)
             nengo.Connection(nengo.Node(lambda t: t < 0.3), self.pos.input[0])
 
