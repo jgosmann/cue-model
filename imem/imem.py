@@ -204,13 +204,24 @@ class IMem(spa.Network):
                              transform=self.task_vocabs.positions.vectors.T)
             nengo.Connection(self.in_pos_gate.output, self.tcm.input_pos)
             self.irrelevant_pos_gate = spa.State(self.task_vocabs.positions)
+            # START
             self.irrelevant_pos = nengo.Node(
-                self.task_vocabs.positions.create_pointer())
+                self.task_vocabs.positions.create_pointer().v)
             nengo.Connection(self.irrelevant_pos,
                              self.irrelevant_pos_gate.input)
-            inhibit_net(self.ctrl.output_no_learn, self.in_pos_gate)
+            with nengo.presets.ThresholdingEnsembles(0.):
+                self.in_pos_gate_inhibit = nengo.Ensemble(25, 1)
+            inhibit_net(self.in_pos_gate_inhibit, self.in_pos_gate)
+            nengo.Connection(
+                self.ctrl.output_no_learn, self.in_pos_gate_inhibit)
+            nengo.Connection(
+                self.ctrl.output_recall_phase, self.in_pos_gate_inhibit,
+                transform=-1)
             inhibit_net(self.ctrl.output_learn, self.irrelevant_pos_gate)
-            nengo.Connection(self.irrelevant_pos_gate, self.tcm.input_pos)
+            inhibit_net(self.ctrl.output_recall_phase, self.irrelevant_pos_gate)
+            nengo.Connection(
+                self.irrelevant_pos_gate.output, self.tcm.input_pos)
+            # END
 
             # Reset of position
             with nengo.presets.ThresholdingEnsembles(0.):
@@ -231,6 +242,9 @@ class IMem(spa.Network):
                 transform=np.atleast_2d(
                     self.task_vocabs.positions.vectors[0]).T,
                 synapse=0.1)
+            nengo.Connection(
+                self.ctrl.output_free_recall,
+                self.start_of_recall, transform=-5.)
 
             # Set position from recalled positions
             self.pos_gate = nengo.networks.EnsembleArray(
@@ -259,8 +273,10 @@ class IMem(spa.Network):
                 self.task_vocabs.items, gamma, recall=True)
             nengo.Connection(self.ctrl.output_stimulus, self.ose.input_item)
             nengo.Connection(self.in_pos_gate.output, self.ose.input_pos)
+            # START
             nengo.Connection(
                 self.irrelevant_pos_gate.output, self.ose.input_pos)
+            # END
             nengo.Connection(self.tcm.output_stim_update_done,
                              self.ose.input_store)
 
