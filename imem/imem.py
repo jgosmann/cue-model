@@ -242,9 +242,10 @@ class IMem(spa.Network):
                 transform=np.atleast_2d(
                     self.task_vocabs.positions.vectors[0]).T,
                 synapse=0.1)
-            nengo.Connection(
-                self.ctrl.output_free_recall,
-                self.start_of_recall, transform=-5.)
+            if np.random.rand() >= 0.2:
+                nengo.Connection(
+                    self.ctrl.output_free_recall,
+                    self.start_of_recall, transform=-5.)
 
             # Set position from recalled positions
             self.pos_gate = nengo.networks.EnsembleArray(

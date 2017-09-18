@@ -46,6 +46,8 @@ class SimAML(nengo.builder.Operator):
 
         def step_assoc_learning():
             scale = 1.
+            # if np.any(np.abs(error)) > 0.:
+                # decoders[...] *= 0.999999
             decoders[...] += alpha * scale * error[:, None] * np.dot(
                 pre, base_decoders.T)
 
