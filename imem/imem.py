@@ -62,7 +62,7 @@ class Control(nengo.Network):
                            self._current_stim.startswith('D')),
                 label='output_no_learn')
             self.output_no_pos_count = nengo.Node(
-                lambda t: (self.protocol.is_recall_phase(t) or
+                lambda t: ((self.protocol.is_recall_phase(t) and not self.protocol.serial) or
                            self._current_stim is None or
                            self._current_stim.startswith('D')) and
                 not protocol.serial,

@@ -401,7 +401,7 @@ class NeuralAccumulatorDecisionProcess(spa.Network):
                 self.inhibit.output, self.inhib_thr.input,
                 transform=self.vocab.vectors)
             nengo.Connection(
-                self.inhib_thr.output, self.state.input[:-1], transform=-1.5)
+                self.inhib_thr.output, self.state.input[:-1], transform=-3.)
 
             # Noise on input
             if noise > 0.:
