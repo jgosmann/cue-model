@@ -363,7 +363,7 @@ class NeuralAccumulatorDecisionProcess(spa.Network):
 
             # Evidence integration
             with nengo.presets.ThresholdingEnsembles(0.):
-                self.state = nengo.networks.EnsembleArray(50, n_items+1)
+                self.state = nengo.networks.EnsembleArray(50, n_items + 1)
             nengo.Connection(
                 self.input, self.inp_thr.input, transform=self.vocab.vectors,
                 synapse=None)
@@ -377,12 +377,12 @@ class NeuralAccumulatorDecisionProcess(spa.Network):
             with nengo.presets.ThresholdingEnsembles(0.8):
                 self.threshold = nengo.networks.EnsembleArray(50, n_items+1)
             nengo.Connection(self.state.output, self.threshold.input)
+            tr = -2 * (1. - np.eye(n_items+1)) + 1. * np.eye(n_items + 1)
             nengo.Connection(
                 self.threshold.add_output(
                     'heaviside', lambda x: 1 if x > 0.8 else 0.),
                 self.state.input,
-                transform=-2 * (1. - np.eye(n_items+1)) + 1. * np.eye(
-                    n_items + 1),
+                transform=tr,
                 synapse=0.1)
 
             # Buffer for recalled item
@@ -402,6 +402,20 @@ class NeuralAccumulatorDecisionProcess(spa.Network):
                 transform=self.vocab.vectors)
             nengo.Connection(
                 self.inhib_thr.output, self.state.input[:-1], transform=-3.)
+
+            for e in self.state.ensembles:
+                nengo.Connection(self.threshold.heaviside[-1], e.neurons, transform=-50. * np.ones((e.n_neurons, 1)), synapse=0.1)
+            self.failed_recall_int = nengo.Ensemble(50, 1)
+            nengo.Connection(
+                self.failed_recall_int, self.failed_recall_int, synapse=0.1, transform=0.9)
+            nengo.Connection(self.threshold.heaviside[-1], self.failed_recall_int, transform=0.1)
+            with nengo.presets.ThresholdingEnsembles(0.):
+                self.failed_recall = nengo.Ensemble(50, 1)
+            nengo.Connection(self.failed_recall_int, self.failed_recall)
+            nengo.Connection(nengo.Node(1.), self.failed_recall, transform=-0.3)
+            # nengo.Connection(
+                # self.failed_recall, self.state.input[-1], transform=-3.,
+                # function=lambda x: x > 0)
 
             # Noise on input
             if noise > 0.:

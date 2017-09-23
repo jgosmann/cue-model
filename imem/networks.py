@@ -80,9 +80,11 @@ def OneHotCounter(n, **kwargs):
         nengo.Connection(
             net.rising_edge_gate, net.advance_threshold.input,
             transform=0.8 * np.ones((n, 1)), function=lambda x: x > 0)
+        tr = 2. * np.roll(np.eye(n), -1, axis=1)
+        tr[0, -1] = 0.
         nengo.Connection(
             net.advance_threshold.output, net.state.input,
-            transform=2. * np.roll(np.eye(n), -1, axis=1), synapse=0.1)
+            transform=tr, synapse=0.1)
 
         net.input = net.state.input
         net.output = net.state.const

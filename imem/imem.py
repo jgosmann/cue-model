@@ -194,6 +194,7 @@ class IMem(spa.Network):
             self.pos = OneHotCounter(len(self.task_vocabs.positions))
             nengo.Connection(self.tcm.output_stim_update_done,
                              self.pos.input_inc, transform=-1)
+            nengo.Connection(self.tcm.recall.threshold.heaviside[-1], self.pos.input_inc, transform=50., synapse=0.1)
             nengo.Connection(
                 self.ctrl.output_no_pos_count, self.pos.rising_edge_gate,
                 transform=-1.)
