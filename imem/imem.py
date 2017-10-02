@@ -195,6 +195,22 @@ class IMem(spa.Network):
             nengo.Connection(self.tcm.output_stim_update_done,
                              self.pos.input_inc, transform=-1)
             nengo.Connection(self.tcm.recall.threshold.heaviside[-1], self.pos.input_inc, transform=50., synapse=0.1)
+            # HERE new connection to advance pos in serial recall
+            # might need removal in free recall
+            # nengo.Connection(
+                # self.tcm.recall.threshold.output[-1], self.pos.input_inc,
+                # transform=2.)
+            # tr = np.atleast_2d(1. * (1. - np.arange(len(self.task_vocabs.positions)) / len(self.task_vocabs.positions)))
+            # nengo.Connection(self.pos.output, self.tcm.net_m_tf.compare.threshold, transform=tr)
+            # nengo.Connection(
+                # nengo.Node(
+                    # lambda t: 0.75 * (1. - np.exp(-t / 1.)) if t < 12. else 0.),
+                # self.tcm.net_m_tf.compare.threshold)
+            nengo.Connection(
+                nengo.Node(1.), self.tcm.net_m_tf.input_lr)
+            nengo.Connection(
+                nengo.Node(1.), self.tcm.net_m_ft.input_lr)
+
             nengo.Connection(
                 self.ctrl.output_no_pos_count, self.pos.rising_edge_gate,
                 transform=-1.)

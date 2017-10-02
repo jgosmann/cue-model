@@ -19,8 +19,8 @@ class AML(nengo.learning_rules.LearningRuleType, SupportDefaultsMixin):
     modifies = 'decoders'
     seed = IntParam('seed', default=None, optional=True, readonly=True)
 
-    def __init__(self, learning_rate=1., seed=Default):
-        super(AML, self).__init__(learning_rate, size_in='post')
+    def __init__(self, d, learning_rate=1., seed=Default):
+        super(AML, self).__init__(learning_rate, size_in=d + 1)
         self.seed = seed
 
 
@@ -45,7 +45,9 @@ class SimAML(nengo.builder.Operator):
         alpha = self.learning_rate * dt
 
         def step_assoc_learning():
-            scale = 1.
+            scale = error[0]
+            error = error[1:]
+            # scale = 1.
             # if np.any(np.abs(error)) > 0.:
                 # decoders[...] *= 0.999999
             decoders[...] += alpha * scale * error[:, None] * np.dot(

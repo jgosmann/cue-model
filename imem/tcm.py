@@ -230,6 +230,7 @@ class AssocMatLearning(spa.Network):
             self.input_cue = self.state.input
             self.input_target = self.target.input
             self.output = nengo.Node(size_in=self.output_vocab.dimensions)
+            self.input_lr = nengo.Node(size_in=1)
 
             for i, e in enumerate(self.state.all_ensembles):
                 sd = e.dimensions
@@ -237,11 +238,14 @@ class AssocMatLearning(spa.Network):
                 end = (i + 1) * sd
                 conn = nengo.Connection(
                     e, self.output[start:end],
-                    learning_rule_type=AML(10.),
+                    learning_rule_type=AML(sd, 10.),
                     function=lambda x, sd=sd: np.zeros(sd),  # noqa, pylint: disable=undefined-variable
                     solver=nengo.solvers.LstsqL2(solver=RandomizedSVD()))
+                n = nengo.Node(size_in=sd + 1)
                 nengo.Connection(
-                    self.target.output[start:end], conn.learning_rule)
+                    self.target.output[start:end], n[1:])
+                nengo.Connection(self.input_lr, n[0])
+                nengo.Connection(n, conn.learning_rule)
 
             self.compare = SimilarityThreshold(self.output_vocab)
             nengo.Connection(self.output, self.compare.input_a)
