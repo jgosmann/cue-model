@@ -43,34 +43,26 @@ class IMemTrial(pytry.NengoTrial):
 
         with spa.Network(seed=p.seed) as model:
             model.config[spa.State].represent_identity = False
+            # model.config[spa.State].neurons_per_dimension = 10
+            # model.config[spa.Bind].neurons_per_dimension = 100
+            # model.config[spa.Compare].neurons_per_dimension = 100
 
             model.imem = IMem(proto, self.vocabs, p.beta, p.gamma, p.noise)
             self.p_recalls = nengo.Probe(model.imem.output, synapse=0.01)
 
-            # self.p_ose = nengo.Probe(model.imem.ose.output, synapse=0.01)
-            self.p_ose_store = nengo.Probe(
-                model.imem.ose.input_store, synapse=0.01)
-            self.p_input_item = nengo.Probe(
-                model.imem.ose.input_item, synapse=0.01)
-            self.p_input_pos = nengo.Probe(
-                model.imem.ose.input_pos, synapse=0.01)
-            self.p_g1 = nengo.Probe(
-                model.imem.ose.combine.diff.output, synapse=0.01)
-            self.p_g2 = nengo.Probe(
-                model.imem.ose.mem.diff.output, synapse=0.01)
-            self.p_combine = nengo.Probe(
-                model.imem.ose.combine.output, synapse=0.01)
+            self.p_recall_state = nengo.Probe(model.imem.tcm.recall.state.output, synapse=0.01)
             self.p_pos = nengo.Probe(model.imem.pos.output, synapse=0.01)
-            self.p_bind = nengo.Probe(model.imem.ose.bind.output, synapse=0.01)
-            self.p_bind_a = nengo.Probe(model.imem.ose.bind.input_a, synapse=0.01)
-            self.p_bind_b = nengo.Probe(model.imem.ose.bind.input_b, synapse=0.01)
+
+            self.p_aml_comp = nengo.Probe(model.imem.tcm.net_m_tf.compare.output, synapse=0.01)
+            self.p_ctx = nengo.Probe(model.imem.tcm.current_ctx.output, synapse=0.01)
+            self.p_ctx_update = nengo.Probe(model.imem.tcm.current_ctx.input_update_context, synapse=0.01)
+            self.p_inhib_recall = nengo.Probe(model.imem.tcm.recall.inhibit.output, synapse=0.01)
 
         return model
 
     def evaluate(self, p, sim, plt):
         proto = self.get_proto(p)
-
-        sim.run(proto.duration + p.recall_duration)
+        sim.run(40.) #proto.duration + p.recall_duration)
 
         recall_vocab = self.vocabs.items.create_subset(proto.get_all_items())
         similarity = spa.similarity(sim.data[self.p_recalls], recall_vocab)
@@ -87,17 +79,12 @@ class IMemTrial(pytry.NengoTrial):
             'vocab_keys': list(self.vocabs.items.keys()),
             'pos_vectors': self.vocabs.positions.vectors,
             'pos_keys': list(self.vocabs.positions.keys()),
-            # 'ose': sim.data[self.p_ose],
-            'ose_store': sim.data[self.p_ose_store],
-            'input_item': sim.data[self.p_input_item],
-            'input_pos': sim.data[self.p_input_pos],
-            'g1': sim.data[self.p_g1],
-            'g2': sim.data[self.p_g2],
-            'combine': sim.data[self.p_combine],
+            'recall_state': sim.data[self.p_recall_state],
             'pos': sim.data[self.p_pos],
-            'bind': sim.data[self.p_bind],
-            'bind_a': sim.data[self.p_bind_a],
-            'bind_b': sim.data[self.p_bind_b],
+            'aml_comp': sim.data[self.p_aml_comp],
+            'ctx': sim.data[self.p_ctx],
+            'ctx…update': sim.data[self.p_ctx_update],
+            'inhib_recall': sim.data[self.p_inhib_recall],
         }
         # if p.debug:
             # np.savez('debug.npz', **result)

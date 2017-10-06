@@ -113,13 +113,19 @@ class TCM(spa.Network):
             # Recall
             self.recall = NeuralAccumulatorDecisionProcess(
                 self.task_vocabs.items.create_subset(protocol.get_all_items()),
-                noise=recall_noise)
+                noise=recall_noise, min_evidence=.0) #0.02)
+            nengo.Connection(self.ctrl.output_serial_recall, self.recall.state.input[-1], transform=0.025)
             self.recall_gate = spa.State(self.task_vocabs.items)
             nengo.Connection(self.current_ctx.output, self.net_m_tf.input_cue)
             nengo.Connection(self.net_m_tf.output, self.recall_gate.input)
-            nengo.Connection(self.recall_gate.output, self.recall.input)
-            nengo.Connection(
-                self.recall.buf.mem.output, self.net_m_ft.input_cue)
+            nengo.Connection(self.recall_gate.output, self.recall.input, transform=1.) # HERE
+            # FIXME needed for immed, take out for serial?
+            # nengo.Connection(
+                # self.recall.buf.mem.output, self.net_m_ft.input_cue)
+            self.recalled_gate = spa.State(self.task_vocabs.items)
+            nengo.Connection(self.recall.buf.mem.output, self.recalled_gate.input)
+            nengo.Connection(self.recalled_gate.output, self.net_m_ft.input_cue)
+            inhibit_net(self.ctrl.output_serial_recall, self.recalled_gate, strength=6)
 
             inhibit_net(self.ctrl.output_pres_phase, self.recall_gate)
             inhibit_net(
@@ -351,7 +357,7 @@ class NeuralAccumulatorDecisionProcess(spa.Network):
     """
     vocab = VocabularyOrDimParam('vocab', optional=False, readonly=True)
 
-    def __init__(self, vocab=Default, noise=0., **kwargs):
+    def __init__(self, vocab=Default, noise=0., min_evidence=0., **kwargs):
         super(NeuralAccumulatorDecisionProcess, self).__init__(**kwargs)
 
         self.vocab = vocab
@@ -374,7 +380,7 @@ class NeuralAccumulatorDecisionProcess(spa.Network):
             nengo.Connection(
                 self.inp_thr.output, self.state.input[:-1], transform=0.1)
             nengo.Connection(
-                nengo.Node(1.), self.state.input[-1], transform=0.0)  # HERE
+                nengo.Node(1.), self.state.input[-1], transform=min_evidence)  # HERE
             nengo.Connection(self.state.output, self.state.input, synapse=0.1)
 
             # Thresholding layer
@@ -394,18 +400,30 @@ class NeuralAccumulatorDecisionProcess(spa.Network):
             nengo.Connection(
                 self.threshold.heaviside[:-1], self.buf.diff.input,
                 transform=self.vocab.vectors.T)
+            nengo.Connection(nengo.Node(1.), self.buf.input_store)
+            nengo.Connection(self.threshold.heaviside[:-1], self.buf.input_store, transform=-np.ones((1, n_items)))
 
             # Inhibition of recalled items
             self.inhibit = spa.State(self.vocab, feedback=1.)
+            self.inhibit_gate = spa.State(self.vocab)
             nengo.Connection(
-                self.buf.mem.output, self.inhibit.input, transform=0.1)
+                self.buf.mem.output, self.inhibit_gate.input)
+            nengo.Connection(self.inhibit_gate.output, self.inhibit.input, synapse=0.1, transform=0.1)
+            self.cmp = spa.Compare(self.vocab, neurons_per_dimension=50)
+            nengo.Connection(self.buf.mem.output, self.cmp.input_a)
+            nengo.Connection(self.inhibit.output, self.cmp.input_b)
+            with nengo.presets.ThresholdingEnsembles(0.):
+                self.inhibit_update_done = nengo.Ensemble(50, 1)
+            nengo.Connection(nengo.Node(-0.5), self.inhibit_update_done)
+            nengo.Connection(self.cmp.output, self.inhibit_update_done)
+            inhibit_net(self.inhibit_update_done, self.inhibit_gate, function=lambda x: x > 0)
             with nengo.presets.ThresholdingEnsembles(0.1):
                 self.inhib_thr = nengo.networks.EnsembleArray(50, n_items)
             nengo.Connection(
                 self.inhibit.output, self.inhib_thr.input,
                 transform=self.vocab.vectors)
             nengo.Connection(
-                self.inhib_thr.output, self.state.input[:-1], transform=-3.)
+                self.inhib_thr.output, self.state.input[:-1], transform=-6.)
 
             for e in self.state.ensembles:
                 nengo.Connection(self.threshold.heaviside[-1], e.neurons, transform=-50. * np.ones((e.n_neurons, 1)), synapse=0.1)

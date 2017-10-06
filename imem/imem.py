@@ -202,12 +202,13 @@ class IMem(spa.Network):
                 # transform=2.)
             # tr = np.atleast_2d(1. * (1. - np.arange(len(self.task_vocabs.positions)) / len(self.task_vocabs.positions)))
             # nengo.Connection(self.pos.output, self.tcm.net_m_tf.compare.threshold, transform=tr)
-            # nengo.Connection(
-                # nengo.Node(
-                    # lambda t: 0.75 * (1. - np.exp(-t / 1.)) if t < 12. else 0.),
-                # self.tcm.net_m_tf.compare.threshold)
             nengo.Connection(
-                nengo.Node(1.), self.tcm.net_m_tf.input_lr)
+                nengo.Node(
+                    lambda t: 0.5 * (1. - np.exp(-t / 1.)) if t < 12. else 0.),
+                self.tcm.net_m_tf.compare.threshold)
+            # nengo.Connection(
+                # nengo.Node(lambda t: 0.5 + 0.5 * np.exp(-t / 1.)), self.tcm.net_m_tf.input_lr)
+            nengo.Connection(nengo.Node(1.), self.tcm.net_m_tf.input_lr)
             nengo.Connection(
                 nengo.Node(1.), self.tcm.net_m_ft.input_lr)
 
