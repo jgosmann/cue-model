@@ -194,7 +194,12 @@ class IMem(spa.Network):
             self.pos = OneHotCounter(len(self.task_vocabs.positions))
             nengo.Connection(self.tcm.output_stim_update_done,
                              self.pos.input_inc, transform=-1)
-            nengo.Connection(self.tcm.recall.threshold.heaviside[-1], self.pos.input_inc, transform=50., synapse=0.1)
+            # nengo.Connection(self.tcm.recall.threshold.heaviside[-1], self.pos.input_inc, transform=50., synapse=0.1)
+            nengo.Connection(self.tcm.recall.failed_recall_heaviside, self.pos.input_inc, transform=50., synapse=0.1)
+            # FIXME update context (input_update_context) with input_inc?
+            # not working?
+            nengo.Connection(self.tcm.recall.failed_recall_heaviside, self.tcm.current_ctx.input_update_context, transform=20.)
+            # nengo.Connection(self.tcm.recall.threshold.heaviside[-1], self.tcm.current_ctx.input_update_context, transform=0.5)
             # HERE new connection to advance pos in serial recall
             # might need removal in free recall
             # nengo.Connection(
@@ -204,7 +209,7 @@ class IMem(spa.Network):
             # nengo.Connection(self.pos.output, self.tcm.net_m_tf.compare.threshold, transform=tr)
             nengo.Connection(
                 nengo.Node(
-                    lambda t: 0.5 * (1. - np.exp(-t / 1.)) if t < 12. else 0.),
+                    lambda t: 0. * (1. - np.exp(-t / 1.)) if t < 12. else 0.),
                 self.tcm.net_m_tf.compare.threshold)
             # nengo.Connection(
                 # nengo.Node(lambda t: 0.5 + 0.5 * np.exp(-t / 1.)), self.tcm.net_m_tf.input_lr)
@@ -262,8 +267,8 @@ class IMem(spa.Network):
                 synapse=0.1)
             if np.random.rand() >= 0.2:
                 nengo.Connection(
-                    self.ctrl.output_free_recall,
-                    self.start_of_recall, transform=-5.)
+                        self.ctrl.output_free_recall,
+                        self.start_of_recall, transform=-5.)
 
             # Set position from recalled positions
             self.pos_gate = nengo.networks.EnsembleArray(
@@ -302,8 +307,9 @@ class IMem(spa.Network):
             # Short term recall
             self.ose_recall_gate = spa.State(self.task_vocabs.items)
             nengo.Connection(self.ose.output, self.ose_recall_gate.input)
+            # FIXME
             nengo.Connection(
-                self.ose_recall_gate.output, self.tcm.recall.input)
+                self.ose_recall_gate.output, self.tcm.recall.input2)
             inhibit_net(self.ctrl.output_pres_phase, self.ose_recall_gate)
             inhibit_net(self.start_of_recall, self.ose_recall_gate)
             inhibit_net(self.start_of_recall, self.tcm.current_ctx.old.mem,

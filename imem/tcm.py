@@ -114,7 +114,9 @@ class TCM(spa.Network):
             self.recall = NeuralAccumulatorDecisionProcess(
                 self.task_vocabs.items.create_subset(protocol.get_all_items()),
                 noise=recall_noise, min_evidence=.0) #0.02)
-            nengo.Connection(self.ctrl.output_serial_recall, self.recall.state.input[-1], transform=0.025)
+            # FIXME
+            # nengo.Connection(self.ctrl.output_serial_recall, self.recall.state.input[-1], transform=0.025)
+            nengo.Connection(nengo.Node(1.), self.recall.state.input[-1], transform=0.025)
             self.recall_gate = spa.State(self.task_vocabs.items)
             nengo.Connection(self.current_ctx.output, self.net_m_tf.input_cue)
             nengo.Connection(self.net_m_tf.output, self.recall_gate.input)
@@ -135,7 +137,7 @@ class TCM(spa.Network):
 
             nengo.Connection(self.recall.buf.output, self.sim_th.input_a)
             nengo.Connection(
-                self.recall.buf.output, self.last_item.input, synapse=0.1)
+                self.recall.buf.output, self.last_item.input, transform=0.1, synapse=0.1)
 
             if len(self.task_vocabs.positions) > 0:
                 self.pos_recall = NeuralAccumulatorDecisionProcess(
@@ -158,7 +160,7 @@ class TCM(spa.Network):
                     self.pos_recall.buf.output, self.sim_th.input_a)
                 nengo.Connection(
                     self.pos_recall.buf.output, self.last_item.input,
-                    synapse=0.1)
+                    transform=0.1, synapse=0.1)
 
             # Initialization of context
             initial_ctx = self.task_vocabs.contexts.create_pointer().v
@@ -320,13 +322,19 @@ class Context(spa.Network):
 
             self.bias = nengo.Node(1)
             self.input_update_context = nengo.Node(size_in=1)
-
-            nengo.Connection(self.bias, self.current.input_store)
+            self.update_ctx_invert = nengo.Ensemble(25, 1)
+            nengo.Connection(self.bias, self.update_ctx_invert)
             nengo.Connection(
-                self.input_update_context, self.current.input_store,
-                transform=-1., synapse=None)
+                self.input_update_context, self.update_ctx_invert.neurons,
+                transform=-2. * np.ones((self.update_ctx_invert.n_neurons, 1)))
 
-            nengo.Connection(self.input_update_context, self.old.input_store)
+            # nengo.Connection(self.bias, self.current.input_store)
+            nengo.Connection(
+                self.update_ctx_invert, self.current.input_store,
+                synapse=.005)#, synapse=None)
+                # transform=-1., synapse=.005)#, synapse=None)
+
+            nengo.Connection(self.input_update_context, self.old.input_store, synapse=0.005)
 
         self.output = self.current.output
         self.inputs = dict(default=(self.input, vocab),
@@ -366,10 +374,12 @@ class NeuralAccumulatorDecisionProcess(spa.Network):
 
         with self:
             self.input = nengo.Node(size_in=d)
+            self.input2 = nengo.Node(size_in=d)
 
             # Input rectification
             with nengo.presets.ThresholdingEnsembles(0.):
                 self.inp_thr = nengo.networks.EnsembleArray(50, n_items)
+                self.inp_thr2 = nengo.networks.EnsembleArray(50, n_items)
 
             # Evidence integration
             with nengo.presets.ThresholdingEnsembles(0.):
@@ -378,7 +388,13 @@ class NeuralAccumulatorDecisionProcess(spa.Network):
                 self.input, self.inp_thr.input, transform=self.vocab.vectors,
                 synapse=None)
             nengo.Connection(
+                self.input2, self.inp_thr2.input, transform=self.vocab.vectors,
+                synapse=None)
+            nengo.Connection(nengo.Node(1.), self.inp_thr2.input, transform=-0.2 * np.ones((n_items, 1)))
+            nengo.Connection(
                 self.inp_thr.output, self.state.input[:-1], transform=0.1)
+            nengo.Connection(
+                self.inp_thr2.output, self.state.input[:-1], transform=0.1)
             nengo.Connection(
                 nengo.Node(1.), self.state.input[-1], transform=min_evidence)  # HERE
             nengo.Connection(self.state.output, self.state.input, synapse=0.1)
@@ -400,8 +416,12 @@ class NeuralAccumulatorDecisionProcess(spa.Network):
             nengo.Connection(
                 self.threshold.heaviside[:-1], self.buf.diff.input,
                 transform=self.vocab.vectors.T)
-            nengo.Connection(nengo.Node(1.), self.buf.input_store)
-            nengo.Connection(self.threshold.heaviside[:-1], self.buf.input_store, transform=-np.ones((1, n_items)))
+            self.buf_input_store = nengo.Ensemble(25, 1)
+            nengo.Connection(self.buf_input_store, self.buf.input_store)
+            nengo.Connection(nengo.Node(1.), self.buf_input_store)
+            nengo.Connection(
+                self.threshold.heaviside[:-1], self.buf_input_store.neurons,
+                transform=-2.*np.ones((self.buf_input_store.n_neurons, n_items)))
 
             # Inhibition of recalled items
             self.inhibit = spa.State(self.vocab, feedback=1.)
@@ -425,16 +445,18 @@ class NeuralAccumulatorDecisionProcess(spa.Network):
             nengo.Connection(
                 self.inhib_thr.output, self.state.input[:-1], transform=-6.)
 
-            for e in self.state.ensembles:
-                nengo.Connection(self.threshold.heaviside[-1], e.neurons, transform=-50. * np.ones((e.n_neurons, 1)), synapse=0.1)
             self.failed_recall_int = nengo.Ensemble(50, 1)
             nengo.Connection(
                 self.failed_recall_int, self.failed_recall_int, synapse=0.1, transform=0.9)
-            nengo.Connection(self.threshold.heaviside[-1], self.failed_recall_int, transform=0.1)
+            nengo.Connection(self.threshold.heaviside[-1], self.failed_recall_int, transform=0.1, synapse=0.1)
             with nengo.presets.ThresholdingEnsembles(0.):
                 self.failed_recall = nengo.Ensemble(50, 1)
             nengo.Connection(self.failed_recall_int, self.failed_recall)
             nengo.Connection(nengo.Node(1.), self.failed_recall, transform=-0.3)
+            self.failed_recall_heaviside = nengo.Node(size_in=1)
+            nengo.Connection(self.failed_recall, self.failed_recall_heaviside, function=lambda x: x > 0.)
+            for e in self.state.ensembles:
+                nengo.Connection(self.failed_recall_heaviside, e.neurons, transform=-50. * np.ones((e.n_neurons, 1)), synapse=0.1)
             # nengo.Connection(
                 # self.failed_recall, self.state.input[-1], transform=-3.,
                 # function=lambda x: x > 0)
