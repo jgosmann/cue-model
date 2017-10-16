@@ -109,13 +109,14 @@ class TCM(spa.Network):
             nengo.Connection(self.current_ctx.output, self.net_m_tf.input_cue)
             nengo.Connection(self.net_m_tf.output, self.recall_gate.input)
             nengo.Connection(self.recall_gate.output, self.recall.input)
-            # FIXME needed for immed, take out for serial?
-            # nengo.Connection(
-                # self.recall.buf.mem.output, self.net_m_ft.input_cue)
+
             self.recalled_gate = spa.State(self.task_vocabs.items)
-            nengo.Connection(self.recall.buf.mem.output, self.recalled_gate.input)
-            nengo.Connection(self.recalled_gate.output, self.net_m_ft.input_cue)
-            inhibit_net(self.ctrl.output_serial_recall, self.recalled_gate, strength=6)
+            nengo.Connection(
+                self.recall.buf.mem.output, self.recalled_gate.input)
+            nengo.Connection(
+                self.recalled_gate.output, self.net_m_ft.input_cue)
+            inhibit_net(
+                self.ctrl.output_serial_recall, self.recalled_gate, strength=6)
 
             inhibit_net(self.ctrl.output_pres_phase, self.recall_gate)
             inhibit_net(
