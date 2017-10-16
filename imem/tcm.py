@@ -104,14 +104,11 @@ class TCM(spa.Network):
             # Recall
             self.recall = NeuralAccumulatorDecisionProcess(
                 self.task_vocabs.items.create_subset(protocol.get_all_items()),
-                noise=recall_noise, min_evidence=.0) #0.02)
-            # FIXME
-            # nengo.Connection(self.ctrl.output_serial_recall, self.recall.state.input[-1], transform=0.025)
-            nengo.Connection(nengo.Node(1.), self.recall.state.input[-1], transform=0.025)
+                noise=recall_noise, min_evidence=.025)
             self.recall_gate = spa.State(self.task_vocabs.items)
             nengo.Connection(self.current_ctx.output, self.net_m_tf.input_cue)
             nengo.Connection(self.net_m_tf.output, self.recall_gate.input)
-            nengo.Connection(self.recall_gate.output, self.recall.input, transform=1.) # HERE
+            nengo.Connection(self.recall_gate.output, self.recall.input)
             # FIXME needed for immed, take out for serial?
             # nengo.Connection(
                 # self.recall.buf.mem.output, self.net_m_ft.input_cue)
