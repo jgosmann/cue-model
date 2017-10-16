@@ -451,7 +451,8 @@ class NeuralAccumulatorDecisionProcess(spa.Network):
             with nengo.presets.ThresholdingEnsembles(0.):
                 self.failed_recall = nengo.Ensemble(50, 1)
             nengo.Connection(self.failed_recall_int, self.failed_recall)
-            nengo.Connection(nengo.Node(1.), self.failed_recall, transform=-0.3)
+            nengo.Connection(
+                nengo.Node(1.), self.failed_recall, transform=-0.3)
             self.failed_recall_heaviside = nengo.Node(size_in=1)
             nengo.Connection(
                 self.failed_recall, self.failed_recall_heaviside,
