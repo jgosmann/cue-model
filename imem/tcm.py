@@ -384,8 +384,6 @@ class NeuralAccumulatorDecisionProcess(spa.Network):
                 nengo.Connection(
                     inp_thr.output, self.state.input[:-1], transform=0.1)
 
-            # FIXME move this line
-            nengo.Connection(nengo.Node(1.), self.inp_thr2.input, transform=-0.2 * np.ones((n_items, 1)))
             self.bias = nengo.Node(1.)
             nengo.Connection(
                 self.bias, self.state.input[-1], transform=min_evidence)

@@ -310,6 +310,10 @@ class IMem(spa.Network):
             # FIXME
             nengo.Connection(
                 self.ose_recall_gate.output, self.tcm.recall.input[1])
+            nengo.Connectiion(
+                nengo.Node(1.), self.tcm.recall.inp_thrs[1].input,
+                transform=-0.2 * np.ones(
+                    (self.tcm.recall.inp_thrs[1].input.size_in, 1)))
             inhibit_net(self.ctrl.output_pres_phase, self.ose_recall_gate)
             inhibit_net(self.start_of_recall, self.ose_recall_gate)
             inhibit_net(self.start_of_recall, self.tcm.current_ctx.old.mem,
