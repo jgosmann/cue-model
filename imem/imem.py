@@ -310,7 +310,7 @@ class IMem(spa.Network):
             # FIXME
             nengo.Connection(
                 self.ose_recall_gate.output, self.tcm.recall.input[1])
-            nengo.Connectiion(
+            nengo.Connection(
                 nengo.Node(1.), self.tcm.recall.inp_thrs[1].input,
                 transform=-0.2 * np.ones(
                     (self.tcm.recall.inp_thrs[1].input.size_in, 1)))
