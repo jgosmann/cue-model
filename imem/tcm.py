@@ -126,7 +126,8 @@ class TCM(spa.Network):
 
             nengo.Connection(self.recall.buf.output, self.sim_th.input_a)
             nengo.Connection(
-                self.recall.buf.output, self.last_item.input, transform=0.1, synapse=0.1)
+                self.recall.buf.output, self.last_item.input, transform=0.1,
+                synapse=0.1)
 
             if len(self.task_vocabs.positions) > 0:
                 self.pos_recall = NeuralAccumulatorDecisionProcess(
@@ -317,13 +318,11 @@ class Context(spa.Network):
                 self.input_update_context, self.update_ctx_invert.neurons,
                 transform=-2. * np.ones((self.update_ctx_invert.n_neurons, 1)))
 
-            # nengo.Connection(self.bias, self.current.input_store)
             nengo.Connection(
                 self.update_ctx_invert, self.current.input_store,
-                synapse=.005)#, synapse=None)
-                # transform=-1., synapse=.005)#, synapse=None)
-
-            nengo.Connection(self.input_update_context, self.old.input_store, synapse=0.005)
+                synapse=.005)
+            nengo.Connection(
+                self.input_update_context, self.old.input_store, synapse=0.005)
 
         self.output = self.current.output
         self.inputs = dict(default=(self.input, vocab),
