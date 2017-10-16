@@ -68,15 +68,9 @@ class TCM(spa.Network):
             # Position input
             self.input_pos = nengo.Node(
                 size_in=self.task_vocabs.positions.dimensions)
-            # self.posv = spa.State(self.task_vocabs.positions)
-            # nengo.Connection(self.input_pos, self.posv.input)
             nengo.Connection(self.input_pos, self.net_m_ft.input_cue)
-            # nengo.Connection(self.posv.output, self.net_m_ft.input_cue)
-            # inhibit_net(self.ctrl.output_free_recall, self.posv)
             nengo.Connection(
                 self.input_pos, self.net_m_tf.input_target)
-            # nengo.Connection(
-                # self.posv.output, self.net_m_tf.input_target, transform=1.)  # HERE too
 
             # Context networks
             self.current_ctx = Context(beta, self.task_vocabs.contexts)
