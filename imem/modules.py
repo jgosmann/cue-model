@@ -22,6 +22,9 @@ class GatedMemory(spa.Network):
         Feedback connection strength.
     feedback_syn : float
         Synaptic time constant of the feedback connection.
+    diff_scale : float
+        Scaling of the difference, determines updating speed, but too large
+        values will cause oscillations.
 
     Attributes
     ----------
@@ -37,19 +40,22 @@ class GatedMemory(spa.Network):
 
     vocab = VocabularyOrDimParam('vocab', optional=False, readonly=True)
 
-    def __init__(self, vocab=Default, feedback=1., feedback_syn=.1, **kwargs):
+    def __init__(
+            self, vocab=Default, feedback=1., feedback_syn=.1, diff_scale=100.,
+            **kwargs):
         super(GatedMemory, self).__init__(**kwargs)
 
         self.vocab = vocab
 
         with self:
             self.diff = spa.State(self.vocab)
-            self.mem = spa.State(self.vocab, feedback=feedback)
+            self.mem = spa.State(
+                self.vocab, feedback=feedback, feedback_synapse=0.1)
             self.input_store = nengo.Node(size_in=1)
 
             nengo.Connection(
-                self.diff.output, self.mem.input, transform=1. / feedback_syn,
-                synapse=feedback_syn)
+                self.diff.output, self.mem.input,
+                transform=diff_scale * feedback_syn, synapse=feedback_syn)
             nengo.Connection(
                 self.mem.output, self.diff.input, transform=-1)
             inhibit_net(
