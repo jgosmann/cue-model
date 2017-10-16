@@ -224,11 +224,6 @@ class IMem(spa.Network):
                     lambda t: -1. * np.exp(-t / 1.) if t < 12. else 0.),
                 self.tcm.net_m_tf.compare.threshold)
 
-            # FIXME constant learning rate, remove
-            nengo.Connection(nengo.Node(1.), self.tcm.net_m_tf.input_lr)
-            nengo.Connection(
-                nengo.Node(1.), self.tcm.net_m_ft.input_lr)
-
             # Use irrelevant position vector to bind distractors
             self.in_pos_gate = spa.State(self.task_vocabs.positions)
             nengo.Connection(self.pos.output, self.in_pos_gate.input,
