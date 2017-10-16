@@ -309,7 +309,7 @@ class IMem(spa.Network):
             nengo.Connection(self.ose.output, self.ose_recall_gate.input)
             # FIXME
             nengo.Connection(
-                self.ose_recall_gate.output, self.tcm.recall.input2)
+                self.ose_recall_gate.output, self.tcm.recall.input[1])
             inhibit_net(self.ctrl.output_pres_phase, self.ose_recall_gate)
             inhibit_net(self.start_of_recall, self.ose_recall_gate)
             inhibit_net(self.start_of_recall, self.tcm.current_ctx.old.mem,
