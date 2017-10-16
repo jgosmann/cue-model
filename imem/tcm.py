@@ -79,13 +79,10 @@ class TCM(spa.Network):
                 # self.posv.output, self.net_m_tf.input_target, transform=1.)  # HERE too
 
             # Context networks
-            self.recalled_ctx = GatedMemory(self.task_vocabs.contexts)
-            nengo.Connection(self.net_m_ft.output, self.recalled_ctx.input)
             self.current_ctx = Context(beta, self.task_vocabs.contexts)
             nengo.Connection(
                 self.current_ctx.output, self.net_m_ft.input_target)
-
-            nengo.Connection(self.recalled_ctx.output, self.current_ctx.input)
+            nengo.Connection(self.net_m_ft.output, self.current_ctx.input)
 
             # Determining update progress
             self.last_item = spa.State(self.task_vocabs.items, feedback=1.)
