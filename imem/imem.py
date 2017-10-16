@@ -128,7 +128,7 @@ class OSE(spa.Network):
     vocab = VocabularyOrDimParam(
         'item_vocab', optional=False, readonly=True)
 
-    def __init__(self, vocab=Default, gamma=0.9775, recall=False, **kwargs):
+    def __init__(self, vocab=Default, gamma=0.9775, **kwargs):
         kwargs.setdefault('label', 'OSE')
         super(OSE, self).__init__(**kwargs)
 
@@ -161,23 +161,22 @@ class OSE(spa.Network):
             self.bias = nengo.Node(1.)
             nengo.Connection(self.bias, self.mem.input_store)
 
-            if recall:
-                self.recall = spa.Bind(self.vocab, invert_a=True)
-                nengo.Connection(self.input_pos, self.recall.input_a)
-                nengo.Connection(self.mem.output, self.recall.input_b)
-                self.output = self.recall.output
-                self.outputs = dict(default=(self.output, self.vocab))
+            self.recall = spa.Bind(self.vocab, invert_a=True)
+            nengo.Connection(self.input_pos, self.recall.input_a)
+            nengo.Connection(self.mem.output, self.recall.input_b)
+            self.output = self.recall.output
 
         self.inputs = dict(
             input_item=(self.input_item, self.vocab),
             input_pos=(self.input_pos, self.vocab),
             input_store=(self.input_store, None))
+        self.outputs = dict(default=(self.output, self.vocab))
 
 
 class IMem(spa.Network):
     def __init__(
-            self, protocol, task_vocabs, beta, gamma=0.9775, recall_noise=0.,
-            **kwargs):
+            self, protocol, task_vocabs, beta, gamma=0.9775, ose_thr=0.2,
+            ordinal_prob=0.2, recall_noise=0., **kwargs):
         kwargs.setdefault('label', 'IMem')
         super(IMem, self).__init__(**kwargs)
 
@@ -203,8 +202,7 @@ class IMem(spa.Network):
                              self.pos.input_inc, transform=-1)
 
             # Short term memory
-            self.ose = OSE(
-                self.task_vocabs.items, gamma, recall=True)
+            self.ose = OSE(self.task_vocabs.items, gamma)
             nengo.Connection(self.ctrl.output_stimulus, self.ose.input_item)
             nengo.Connection(
                 self.tcm.output_stim_update_done, self.ose.input_store)
@@ -274,8 +272,7 @@ class IMem(spa.Network):
                 synapse=0.1)
 
             # Certain fraction of recalls use ordinal strategy
-            # FIXME model parameter
-            if np.random.rand() >= 0.2:
+            if np.random.rand() >= ordinal_prob:
                 nengo.Connection(
                     self.ctrl.output_free_recall, self.start_of_recall,
                     transform=-5.)
@@ -307,8 +304,7 @@ class IMem(spa.Network):
             nengo.Connection(self.ose.output, self.ose_recall_gate.input)
             nengo.Connection(
                 self.ose_recall_gate.output, self.tcm.recall.input[1])
-            # FIXME param
-            self.ose_recall_threshold = nengo.Node(0.2)
+            self.ose_recall_threshold = nengo.Node(ose_thr)
             nengo.Connection(
                 self.ose_recall_threshold, self.tcm.recall.inp_thrs[1].input,
                 transform=-np.ones(

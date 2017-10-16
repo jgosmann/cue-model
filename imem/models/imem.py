@@ -31,8 +31,10 @@ class IMemTrial(pytry.NengoTrial):
         self.param("item dimensionality", item_d=256)
         self.param("context dimensionality", context_d=256)
         self.param("contextual drift rate", beta=0.62676)
-        self.param("OSE memory decay", gamma=0.9775)
         self.param("distractor rate", distractor_rate=1.)
+        self.param("OSE memory decay", gamma=0.9775)
+        self.param("OSE memory threshold", ose_thr=0.2)
+        self.param("TCM prob. to recall from beginning", ordinal_prob=0.2)
         self.param("noise in recall", noise=0.)
         self.param("protocol", protocol='immed')
         self.param("recall duration", recall_duration=60.)
@@ -47,7 +49,9 @@ class IMemTrial(pytry.NengoTrial):
             # model.config[spa.Bind].neurons_per_dimension = 100
             # model.config[spa.Compare].neurons_per_dimension = 100
 
-            model.imem = IMem(proto, self.vocabs, p.beta, p.gamma, p.noise)
+            model.imem = IMem(
+                proto, self.vocabs, p.beta, p.gamma, p.noise,
+                p.ose_thr, p.ordinal_prob)
             self.p_recalls = nengo.Probe(model.imem.output, synapse=0.01)
 
             self.p_recall_state = nengo.Probe(model.imem.tcm.recall.state.output, synapse=0.01)
