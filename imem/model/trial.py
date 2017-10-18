@@ -8,7 +8,7 @@ import numpy as np
 import pytry
 
 from imem import protocols
-from imem.imem import IMem, Vocabularies
+from imem.model import IMem, Vocabularies
 
 
 class IMemTrial(pytry.NengoTrial):

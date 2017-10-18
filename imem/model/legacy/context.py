@@ -4,7 +4,7 @@ import nengo
 import nengo_spa as spa
 import numpy as np
 
-from imem.modules import GatedMemory
+from imem.model.modules import GatedMemory
 from imem.utils.nengo import inhibit_net
 
 

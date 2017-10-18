@@ -7,8 +7,8 @@ import nengo_spa as spa
 from nengo_spa.vocab import VocabularyOrDimParam
 import numpy as np
 
-from imem.amlearn import AML
-from imem.modules import GatedMemory, SimilarityThreshold
+from imem.model.amlearn import AML
+from imem.model.modules import GatedMemory, SimilarityThreshold
 from imem.utils.nengo import inhibit_net
 
 
