@@ -3,7 +3,7 @@ import numpy as np
 
 
 def OneHotCounter(n, **kwargs):
-    with nengo.Network(seed=73, **kwargs) as net:
+    with nengo.Network(**kwargs) as net:
         with nengo.presets.ThresholdingEnsembles(0.):
             net.state = nengo.networks.EnsembleArray(40, n)
             net.inhibit_threshold = nengo.networks.EnsembleArray(40, n)
