@@ -303,7 +303,7 @@ class IMem(spa.Network):
             self.ose_recall_gate = spa.State(self.task_vocabs.items)
             nengo.Connection(self.ose.output, self.ose_recall_gate.input)
             nengo.Connection(
-                self.ose_recall_gate.output, self.tcm.recall.input[1])
+                self.ose_recall_gate.output, self.tcm.recall.input_list[1])
             self.ose_recall_threshold = nengo.Node(ose_thr)
             nengo.Connection(
                 self.ose_recall_threshold, self.tcm.recall.inp_thrs[1].input,

@@ -108,7 +108,8 @@ class TCM(spa.Network):
             self.recall_gate = spa.State(self.task_vocabs.items)
             nengo.Connection(self.current_ctx.output, self.net_m_tf.input_cue)
             nengo.Connection(self.net_m_tf.output, self.recall_gate.input)
-            nengo.Connection(self.recall_gate.output, self.recall.input[0])
+            nengo.Connection(
+                self.recall_gate.output, self.recall.input_list[0])
 
             self.recalled_gate = spa.State(self.task_vocabs.items)
             nengo.Connection(
@@ -133,7 +134,7 @@ class TCM(spa.Network):
                 self.pos_recall = NeuralAccumulatorDecisionProcess(
                     self.task_vocabs.positions, noise=recall_noise)
                 nengo.Connection(
-                    self.recall_gate.output, self.pos_recall.input[0])
+                    self.recall_gate.output, self.pos_recall.input_list[0])
                 nengo.Connection(
                     self.pos_recall.buf.mem.output, self.net_m_ft.input_cue)
                 inhibit_net(
@@ -365,7 +366,7 @@ class NeuralAccumulatorDecisionProcess(spa.Network):
 
         with self:
             assert n_inputs > 0
-            self.inputs = [nengo.Node(size_in=d) for _ in range(n_inputs)]
+            self.input_list = [nengo.Node(size_in=d) for _ in range(n_inputs)]
 
             # Input rectification
             with nengo.presets.ThresholdingEnsembles(0.):
@@ -471,5 +472,5 @@ class NeuralAccumulatorDecisionProcess(spa.Network):
 
             self.output = self.buf.output
 
-        self.inputs = dict(default=(self.input[0], self.vocab))
+        self.inputs = dict(default=(self.input_list[0], self.vocab))
         self.outputs = dict(default=(self.output, self.vocab))
