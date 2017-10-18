@@ -134,6 +134,8 @@ class IMem(spa.Network):
         self.task_vocabs = task_vocabs
 
         with self:
+            self.config[spa.State].represent_identity = False
+
             self.ctrl = Control(protocol, self.task_vocabs.items)
 
             # TCM

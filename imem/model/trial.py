@@ -44,43 +44,41 @@ class IMemTrial(pytry.NengoTrial):
         self.vocabs = Vocabularies(proto, p.item_d, p.context_d, p.n_items + 3)
 
         with spa.Network(seed=p.seed) as model:
-            model.config[spa.State].represent_identity = False
-            # model.config[spa.State].neurons_per_dimension = 10
-            # model.config[spa.Bind].neurons_per_dimension = 100
-            # model.config[spa.Compare].neurons_per_dimension = 100
-
             model.imem = IMem(
                 proto, self.vocabs, p.beta, p.gamma, p.noise,
                 p.ose_thr, p.ordinal_prob)
             self.p_recalls = nengo.Probe(model.imem.output, synapse=0.01)
 
-            self.p_recall_state = nengo.Probe(model.imem.tcm.recall.state.output, synapse=0.01)
-            self.p_recall_threshold = nengo.Probe(model.imem.tcm.recall.threshold.heaviside, synapse=0.01)
-            self.p_recall_buf = nengo.Probe(model.imem.tcm.recall.buf.output, synapse=0.01)
-            self.p_pos = nengo.Probe(model.imem.pos.output, synapse=0.01)
-
-            self.p_pos_recall_state = nengo.Probe(model.imem.tcm.pos_recall.state.output, synapse=0.01)
-            self.p_pos_recall_buf = nengo.Probe(model.imem.tcm.pos_recall.buf.output, synapse=0.01)
-
-            self.p_aml_comp = nengo.Probe(model.imem.tcm.net_m_tf.compare.output, synapse=0.01)
-            self.p_ctx = nengo.Probe(model.imem.tcm.current_ctx.output, synapse=0.01)
-            self.p_ctx_update = nengo.Probe(model.imem.tcm.current_ctx.input_update_context, synapse=0.01)
-            self.p_inhib_recall = nengo.Probe(model.imem.tcm.recall.inhibit.output, synapse=0.01)
-            self.p_recall_ctx = nengo.Probe(model.imem.tcm.net_m_ft.output, synapse=0.01)
-            self.p_recall_ctx_cue = nengo.Probe(model.imem.tcm.net_m_ft.input_cue, synapse=0.01)
-
-            self.p_input_pos = nengo.Probe(model.imem.tcm.input_pos, synapse=0.01)
-            self.p_current_ctx = nengo.Probe(model.imem.tcm.current_ctx.output, synapse=0.01)
-            self.p_input_update_ctx = nengo.Probe(model.imem.tcm.current_ctx.input_update_context, synapse=0.01)
-            self.p_sim_th = nengo.Probe(model.imem.tcm.sim_th.output, synapse=0.01)
-            self.p_last_item = nengo.Probe(model.imem.tcm.last_item.output, synapse=0.01)
-
-            self.p_ose_output = nengo.Probe(model.imem.ose.output, synapse=0.01)
-            self.p_tcm_output = nengo.Probe(model.imem.tcm.net_m_tf.output, synapse=0.01)
-
-            self.p_failed_recall_int = nengo.Probe(model.imem.tcm.recall.failed_recall_int, synapse=0.01)
-            self.p_failed_recall = nengo.Probe(model.imem.tcm.recall.failed_recall, synapse=0.01)
-            self.p_failed_recall_heaviside = nengo.Probe(model.imem.tcm.recall.failed_recall_heaviside, synapse=0.01)
+            self.debug_probes = {
+                'recall_state': model.imem.tcm.recall.state.output,
+                'recall_threshold': model.imem.tcm.recall.threshold.heaviside,
+                'recall_buf': model.imem.tcm.recall.buf.output,
+                'pos': model.imem.pos.output,
+                'pos_recall_state': model.imem.tcm.pos_recall.state.output,
+                'pos_recall_buf': model.imem.tcm.pos_recall.buf.output,
+                'aml_comp': model.imem.tcm.net_m_tf.compare.output,
+                'ctx': model.imem.tcm.current_ctx.output,
+                'ctx_update': model.imem.tcm.current_ctx.input_update_context,
+                'inhib_recall': model.imem.tcm.recall.inhibit.output,
+                'recall_ctx': model.imem.tcm.net_m_ft.output,
+                'recall_ctx_cue': model.imem.tcm.net_m_ft.input_cue,
+                'input_pos': model.imem.tcm.input_pos,
+                'current_ctx': model.imem.tcm.current_ctx.output,
+                'input_update_ctx':
+                    model.imem.tcm.current_ctx.input_update_context,
+                'sim_th': model.imem.tcm.sim_th.output,
+                'last_item': model.imem.tcm.last_item.output,
+                'ose_output': model.imem.ose.output,
+                'tcm_output': model.imem.tcm.net_m_tf.output,
+                'failed_recall_int': model.imem.tcm.recall.failed_recall_int,
+                'failed_recall': model.imem.tcm.recall.failed_recall,
+                'failed_recall_heaviside':
+                    model.imem.tcm.recall.failed_recall_heaviside,
+            }
+            if p.debug:
+                for k in self.debug_probes:
+                    self.debug_probes[k] = nengo.Probe(
+                        self.debug_probes[k], synapse=0.01)
 
         return model
 
@@ -103,29 +101,8 @@ class IMemTrial(pytry.NengoTrial):
             'vocab_keys': list(self.vocabs.items.keys()),
             'pos_vectors': self.vocabs.positions.vectors,
             'pos_keys': list(self.vocabs.positions.keys()),
-            'recall_state': sim.data[self.p_recall_state],
-            'recall_threshold': sim.data[self.p_recall_threshold],
-            'recall_buf': sim.data[self.p_recall_buf],
-            'pos': sim.data[self.p_pos],
-            'aml_comp': sim.data[self.p_aml_comp],
-            'ctx': sim.data[self.p_ctx],
-            'ctx_update': sim.data[self.p_ctx_update],
-            'inhib_recall': sim.data[self.p_inhib_recall],
-            'recall_ctx': sim.data[self.p_recall_ctx],
-            'recall_ctx_cue': sim.data[self.p_recall_ctx_cue],
-            'input_pos': sim.data[self.p_input_pos],
-            'current_ctx': sim.data[self.p_current_ctx],
-            'input_update_ctx': sim.data[self.p_input_update_ctx],
-            'sim_th': sim.data[self.p_sim_th],
-            'last_item': sim.data[self.p_last_item],
-            'ose_output': sim.data[self.p_ose_output],
-            'tcm_output': sim.data[self.p_tcm_output],
-            'failed_recall_int': sim.data[self.p_failed_recall_int],
-            'failed_recall': sim.data[self.p_failed_recall],
-            'failed_recall_heaviside': sim.data[self.p_failed_recall_heaviside],
-            'pos_recall_state': sim.data[self.p_pos_recall_state],
-            'pos_recall_buf': sim.data[self.p_pos_recall_buf],
         }
-        # if p.debug:
-            # np.savez('debug.npz', **result)
+        if p.debug:
+            result.update(
+                {k: sim.data[v] for k, v in self.debug_probes.items()})
         return result
