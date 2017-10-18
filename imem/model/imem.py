@@ -173,7 +173,7 @@ class IMem(spa.Network):
             # FIXME time dependence for different protocols
             nengo.Connection(
                 nengo.Node(
-                    lambda t: -1. * np.exp(-t / 1.) if t < 12. else 0.),
+                    lambda t: -.5 * np.exp(-t / 1.) if t < 12. else 0.),
                 self.tcm.net_m_tf.compare.threshold)
 
             # Use irrelevant position vector to bind distractors
