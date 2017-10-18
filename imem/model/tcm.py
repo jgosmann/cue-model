@@ -378,7 +378,7 @@ class NeuralAccumulatorDecisionProcess(spa.Network):
             with nengo.presets.ThresholdingEnsembles(0.):
                 self.state = nengo.networks.EnsembleArray(50, n_items + 1)
 
-            for inp, inp_thr in zip(self.inputs, self.inp_thrs):
+            for inp, inp_thr in zip(self.input_list, self.inp_thrs):
                 nengo.Connection(
                     inp, inp_thr.input,
                     transform=self.vocab.vectors, synapse=None)
