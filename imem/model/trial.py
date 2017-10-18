@@ -51,29 +51,28 @@ class IMemTrial(pytry.NengoTrial):
             self.p_pos = nengo.Probe(model.imem.output_pos, synapse=0.01)
 
             self.debug_probes = {
-                'recall_state': model.imem.tcm.recall.state.output,
-                'recall_threshold': model.imem.tcm.recall.threshold.heaviside,
-                'recall_buf': model.imem.tcm.recall.buf.output,
-                'pos_recall_state': model.imem.tcm.pos_recall.state.output,
-                'pos_recall_buf': model.imem.tcm.pos_recall.buf.output,
+                'recall_state': model.imem.recall.state.output,
+                'recall_threshold': model.imem.recall.threshold.heaviside,
+                'recall_buf': model.imem.recall.buf.output,
+                'pos_recall_state': model.imem.pos_recall.state.output,
+                'pos_recall_buf': model.imem.pos_recall.buf.output,
                 'aml_comp': model.imem.tcm.net_m_tf.compare.output,
                 'ctx': model.imem.tcm.current_ctx.output,
                 'ctx_update': model.imem.tcm.current_ctx.input_update_context,
-                'inhib_recall': model.imem.tcm.recall.inhibit.output,
+                'inhib_recall': model.imem.recall.inhibit.output,
                 'recall_ctx': model.imem.tcm.net_m_ft.output,
                 'recall_ctx_cue': model.imem.tcm.net_m_ft.input_cue,
                 'input_pos': model.imem.tcm.input_pos,
                 'current_ctx': model.imem.tcm.current_ctx.output,
-                'input_update_ctx':
-                    model.imem.tcm.current_ctx.input_update_context,
-                'sim_th': model.imem.tcm.sim_th.output,
-                'last_item': model.imem.tcm.last_item.output,
+                'input_update_ctx': model.imem.tcm.input_update_context,
+                'sim_th': model.imem.sim_th.output,
+                'last_item': model.imem.last_item.output,
                 'ose_output': model.imem.ose.output,
                 'tcm_output': model.imem.tcm.net_m_tf.output,
-                'failed_recall_int': model.imem.tcm.recall.failed_recall_int,
-                'failed_recall': model.imem.tcm.recall.failed_recall,
+                'failed_recall_int': model.imem.recall.failed_recall_int,
+                'failed_recall': model.imem.recall.failed_recall,
                 'failed_recall_heaviside':
-                    model.imem.tcm.recall.failed_recall_heaviside,
+                    model.imem.recall.failed_recall_heaviside,
             }
             if p.debug:
                 for k in self.debug_probes:

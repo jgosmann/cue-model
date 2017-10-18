@@ -41,7 +41,7 @@ class TCM(spa.Network):
     """
 
     # pylint: disable=too-many-statements,too-many-arguments
-    def __init__(self, task_vocabs, ctrl, beta, **kwargs):
+    def __init__(self, task_vocabs, beta, **kwargs):
         kwargs.setdefault('label', 'TCM')
         super(TCM, self).__init__(**kwargs)
 
@@ -49,7 +49,6 @@ class TCM(spa.Network):
 
         with self:
             self.bias = nengo.Node(1.)
-            self.ctrl = ctrl
 
             # Association networks
             self.net_m_tf = AssocMatLearning(
@@ -78,14 +77,9 @@ class TCM(spa.Network):
             nengo.Connection(self.current_ctx.output, self.net_m_tf.input_cue)
 
             # Control of learning
-            self.no_learn = nengo.Node(size_in=1)
-            nengo.Connection(
-                self.ctrl.output_no_learn, self.no_learn, transform=2.)
-            nengo.Connection(self.no_learn, self.net_m_ft.input_no_learn)
-            nengo.Connection(self.no_learn, self.net_m_tf.input_no_learn)
-
-            nengo.Connection(self.bias, self.no_learn)
-            nengo.Connection(self.sim_th.output, self.no_learn, transform=-1)
+            self.input_no_learn = nengo.Node(size_in=1)
+            nengo.Connection(self.input_no_learn, self.net_m_ft.input_no_learn)
+            nengo.Connection(self.input_no_learn, self.net_m_tf.input_no_learn)
 
             # Initialization of context
             initial_ctx = self.task_vocabs.contexts.create_pointer().v
@@ -98,17 +92,16 @@ class TCM(spa.Network):
                 self.current_ctx.old.input_store)
 
             self.input_update_context = self.current_ctx.input_update_context
-            self.output_stim_update_done = self.sim_th.output
             self.output_recalled_item = self.net_m_tf.output
 
         self.inputs = dict(
             default=(self.input, self.task_vocabs.items),
             input_pos=(self.input_pos, self.task_vocabs.positions),
-            input_update_context=(self.input_update_context, None))
+            input_update_context=(self.input_update_context, None),
+            input_no_learn=(self.input_no_learn, None))
         self.outputs = dict(
             output_recalled_item=(
-                self.output_recalled_item, self.task_vocabs.items),
-            output_stim_update_done=(self.output_stim_update_done, None))
+                self.output_recalled_item, self.task_vocabs.items))
 
 
 class AssocMatLearning(spa.Network):
