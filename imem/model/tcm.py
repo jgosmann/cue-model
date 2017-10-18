@@ -41,9 +41,7 @@ class TCM(spa.Network):
     """
 
     # pylint: disable=too-many-statements,too-many-arguments
-    def __init__(
-            self, task_vocabs, protocol, ctrl, beta, recall_noise=0.,
-            **kwargs):
+    def __init__(self, task_vocabs, ctrl, beta, **kwargs):
         kwargs.setdefault('label', 'TCM')
         super(TCM, self).__init__(**kwargs)
 
@@ -77,19 +75,7 @@ class TCM(spa.Network):
             nengo.Connection(
                 self.current_ctx.output, self.net_m_ft.input_target)
             nengo.Connection(self.net_m_ft.output, self.current_ctx.input)
-
-            # Determining update progress
-            self.last_item = spa.State(self.task_vocabs.items, feedback=1.)
-            self.sim_th = SimilarityThreshold(self.task_vocabs.items)
-            nengo.Connection(self.ctrl.output_stimulus, self.sim_th.input_a)
-            nengo.Connection(self.last_item.output, self.sim_th.input_b)
-            nengo.Connection(self.bias, self.current_ctx.input_update_context)
-            nengo.Connection(
-                self.sim_th.output, self.current_ctx.input_update_context,
-                transform=-1.)
-            nengo.Connection(
-                self.ctrl.output_stimulus, self.last_item.input, transform=1.,
-                synapse=0.1)
+            nengo.Connection(self.current_ctx.output, self.net_m_tf.input_cue)
 
             # Control of learning
             self.no_learn = nengo.Node(size_in=1)
@@ -101,58 +87,6 @@ class TCM(spa.Network):
             nengo.Connection(self.bias, self.no_learn)
             nengo.Connection(self.sim_th.output, self.no_learn, transform=-1)
 
-            # Recall
-            self.recall = NeuralAccumulatorDecisionProcess(
-                self.task_vocabs.items.create_subset(protocol.get_all_items()),
-                noise=recall_noise, min_evidence=.025, n_inputs=2)
-            self.recall_gate = spa.State(self.task_vocabs.items)
-            nengo.Connection(self.current_ctx.output, self.net_m_tf.input_cue)
-            nengo.Connection(self.net_m_tf.output, self.recall_gate.input)
-            nengo.Connection(
-                self.recall_gate.output, self.recall.input_list[0])
-
-            self.recalled_gate = spa.State(self.task_vocabs.items)
-            nengo.Connection(
-                self.recall.buf.mem.output, self.recalled_gate.input)
-            nengo.Connection(
-                self.recalled_gate.output, self.net_m_ft.input_cue)
-            inhibit_net(
-                self.ctrl.output_serial_recall, self.recalled_gate, strength=6)
-
-            inhibit_net(self.ctrl.output_pres_phase, self.recall_gate)
-            inhibit_net(
-                self.ctrl.output_pres_phase, self.recall.buf.mem, strength=6)
-            inhibit_net(self.ctrl.output_pres_phase, self.recall.state)
-            inhibit_net(self.ctrl.output_pres_phase, self.recall.inhibit)
-
-            nengo.Connection(self.recall.buf.output, self.sim_th.input_a)
-            nengo.Connection(
-                self.recall.buf.output, self.last_item.input, transform=0.1,
-                synapse=0.1)
-
-            if len(self.task_vocabs.positions) > 0:
-                self.pos_recall = NeuralAccumulatorDecisionProcess(
-                    self.task_vocabs.positions, noise=recall_noise)
-                nengo.Connection(
-                    self.recall_gate.output, self.pos_recall.input_list[0])
-                nengo.Connection(
-                    self.pos_recall.buf.mem.output, self.net_m_ft.input_cue)
-                inhibit_net(
-                    self.ctrl.output_serial_recall, self.pos_recall.buf)
-
-                inhibit_net(
-                    self.ctrl.output_pres_phase, self.pos_recall.buf.mem,
-                    strength=6)
-                inhibit_net(self.ctrl.output_pres_phase, self.pos_recall.state)
-                inhibit_net(
-                    self.ctrl.output_pres_phase, self.pos_recall.inhibit)
-
-                nengo.Connection(
-                    self.pos_recall.buf.output, self.sim_th.input_a)
-                nengo.Connection(
-                    self.pos_recall.buf.output, self.last_item.input,
-                    transform=0.1, synapse=0.1)
-
             # Initialization of context
             initial_ctx = self.task_vocabs.contexts.create_pointer().v
             ctx_init = nengo.Node(
@@ -163,15 +97,18 @@ class TCM(spa.Network):
                 nengo.Node(lambda t: 4 if t < 0.3 else 0),
                 self.current_ctx.old.input_store)
 
-            self.output = self.recall.output
+            self.input_update_context = self.current_ctx.input_update_context
             self.output_stim_update_done = self.sim_th.output
+            self.output_recalled_item = self.net_m_tf.output
 
         self.inputs = dict(
             default=(self.input, self.task_vocabs.items),
-            input_pos=(self.input_pos, self.task_vocabs.positions))
+            input_pos=(self.input_pos, self.task_vocabs.positions),
+            input_update_context=(self.input_update_context, None))
         self.outputs = dict(
-            default=(self.output, self.task_vocabs.items),
-            stim_update_done=(self.output_stim_update_done, None))
+            output_recalled_item=(
+                self.output_recalled_item, self.task_vocabs.items),
+            output_stim_update_done=(self.output_stim_update_done, None))
 
 
 class AssocMatLearning(spa.Network):
@@ -326,151 +263,7 @@ class Context(spa.Network):
                 self.input_update_context, self.old.input_store, synapse=0.005)
 
         self.output = self.current.output
-        self.inputs = dict(default=(self.input, vocab),
-                           update_context=(self.input_update_context, None))
+        self.inputs = dict(
+            default=(self.input, vocab),
+            input_update_context=(self.input_update_context, None))
         self.outputs = dict(default=(self.output, vocab))
-
-
-class NeuralAccumulatorDecisionProcess(spa.Network):
-    """Neural independent accumulator decision process for recall.
-
-    Parameters
-    ----------
-    vocab : nengo_spa.Vocabulary or int
-        Vocabulary to use for recallable pointers.
-    noise : float
-        Amount of noise to add to the input.
-    kwargs : dict
-        Passed on to `nengo_spa.Network`.
-
-    Attributes
-    ----------
-    vocab : nengo_spa.Vocabulary
-        Vocabulary to use for recallable pointers.
-    input : nengo.Node
-        Input of retrieved vector.
-    output : nengo.Node
-        Recalled vector.
-    """
-    vocab = VocabularyOrDimParam('vocab', optional=False, readonly=True)
-
-    # pylint: disable=too-many-statements
-    def __init__(
-            self, vocab=Default, noise=0., min_evidence=0., n_inputs=1,
-            **kwargs):
-        super(NeuralAccumulatorDecisionProcess, self).__init__(**kwargs)
-
-        self.vocab = vocab
-
-        n_items, d = self.vocab.vectors.shape
-
-        with self:
-            assert n_inputs > 0
-            self.input_list = [nengo.Node(size_in=d) for _ in range(n_inputs)]
-
-            # Input rectification
-            with nengo.presets.ThresholdingEnsembles(0.):
-                self.inp_thrs = [
-                    nengo.networks.EnsembleArray(50, n_items)
-                    for _ in range(n_inputs)]
-
-            # Evidence integration
-            with nengo.presets.ThresholdingEnsembles(0.):
-                self.state = nengo.networks.EnsembleArray(50, n_items + 1)
-
-            for inp, inp_thr in zip(self.input_list, self.inp_thrs):
-                nengo.Connection(
-                    inp, inp_thr.input,
-                    transform=self.vocab.vectors, synapse=None)
-                nengo.Connection(
-                    inp_thr.output, self.state.input[:-1], transform=0.1)
-
-            self.bias = nengo.Node(1.)
-            nengo.Connection(
-                self.bias, self.state.input[-1], transform=min_evidence)
-            nengo.Connection(self.state.output, self.state.input, synapse=0.1)
-
-            # Thresholding layer
-            with nengo.presets.ThresholdingEnsembles(0.8):
-                self.threshold = nengo.networks.EnsembleArray(50, n_items+1)
-            nengo.Connection(self.state.output, self.threshold.input)
-            tr = -2 * (1. - np.eye(n_items+1)) + 1. * np.eye(n_items + 1)
-            nengo.Connection(
-                self.threshold.add_output(
-                    'heaviside', lambda x: 1 if x > 0.8 else 0.),
-                self.state.input,
-                transform=tr,
-                synapse=0.1)
-
-            # Buffer for recalled item
-            self.buf = GatedMemory(self.vocab)
-            nengo.Connection(
-                self.threshold.heaviside[:-1], self.buf.diff.input,
-                transform=self.vocab.vectors.T)
-            self.buf_input_store = nengo.Ensemble(25, 1)
-            nengo.Connection(self.buf_input_store, self.buf.input_store)
-            nengo.Connection(nengo.Node(1.), self.buf_input_store)
-            nengo.Connection(
-                self.threshold.heaviside[:-1], self.buf_input_store.neurons,
-                transform=-2. * np.ones(
-                    (self.buf_input_store.n_neurons, n_items)))
-
-            # Inhibition of recalled items
-            self.inhibit = spa.State(self.vocab, feedback=1.)
-            self.inhibit_gate = spa.State(self.vocab)
-            nengo.Connection(
-                self.buf.mem.output, self.inhibit_gate.input)
-            nengo.Connection(
-                self.inhibit_gate.output, self.inhibit.input, synapse=0.1,
-                transform=0.1)
-            self.cmp = spa.Compare(self.vocab, neurons_per_dimension=50)
-            nengo.Connection(self.buf.mem.output, self.cmp.input_a)
-            nengo.Connection(self.inhibit.output, self.cmp.input_b)
-            with nengo.presets.ThresholdingEnsembles(0.):
-                self.inhibit_update_done = nengo.Ensemble(50, 1)
-            nengo.Connection(nengo.Node(-0.5), self.inhibit_update_done)
-            nengo.Connection(self.cmp.output, self.inhibit_update_done)
-            inhibit_net(
-                self.inhibit_update_done, self.inhibit_gate,
-                function=lambda x: x > 0)
-            with nengo.presets.ThresholdingEnsembles(0.1):
-                self.inhib_thr = nengo.networks.EnsembleArray(50, n_items)
-            nengo.Connection(
-                self.inhibit.output, self.inhib_thr.input,
-                transform=self.vocab.vectors)
-            nengo.Connection(
-                self.inhib_thr.output, self.state.input[:-1], transform=-6.)
-
-            # Start over if recall fails
-            self.failed_recall_int = nengo.Ensemble(50, 1)
-            nengo.Connection(
-                self.failed_recall_int, self.failed_recall_int, synapse=0.1,
-                transform=0.9)
-            nengo.Connection(
-                self.threshold.heaviside[-1], self.failed_recall_int,
-                transform=0.1, synapse=0.1)
-            with nengo.presets.ThresholdingEnsembles(0.):
-                self.failed_recall = nengo.Ensemble(50, 1)
-            nengo.Connection(self.failed_recall_int, self.failed_recall)
-            nengo.Connection(
-                nengo.Node(1.), self.failed_recall, transform=-0.3)
-            self.failed_recall_heaviside = nengo.Node(size_in=1)
-            nengo.Connection(
-                self.failed_recall, self.failed_recall_heaviside,
-                function=lambda x: x > 0.)
-            for e in self.state.ensembles:
-                nengo.Connection(
-                    self.failed_recall_heaviside, e.neurons,
-                    transform=-50. * np.ones((e.n_neurons, 1)), synapse=0.1)
-
-            # Noise on input
-            if noise > 0.:
-                self.noise = nengo.Node(nengo.processes.WhiteNoise(
-                    dist=nengo.dists.Gaussian(mean=0., std=noise)),
-                                        size_out=n_items+1)
-                nengo.Connection(self.noise, self.state.input)
-
-            self.output = self.buf.output
-
-        self.inputs = dict(default=(self.input_list[0], self.vocab))
-        self.outputs = dict(default=(self.output, self.vocab))

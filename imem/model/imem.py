@@ -9,8 +9,10 @@ from nengo_spa.vocab import (
     VocabularyMap, VocabularyMapParam, VocabularyOrDimParam)
 import numpy as np
 
+from imem.model.modules import SimilarityThreshold
 from imem.model.networks import OneHotCounter
 from imem.model.ose import OSE
+from imem.model.recall import NeuralAccumulatorDecisionProcess
 from imem.model.tcm import TCM
 from imem.utils.nengo import inhibit_net
 
@@ -62,12 +64,13 @@ class Control(nengo.Network):
                            self._current_stim.startswith('D')),
                 label='output_no_learn')
             self.output_no_pos_count = nengo.Node(
-                lambda t: ((self.protocol.is_recall_phase(t) and not self.protocol.serial) or
-                           self._current_stim is None or
-                           self._current_stim.startswith('D')) and
-                not protocol.serial,
+                lambda t: (
+                    (self.protocol.is_recall_phase(t) and
+                     not self.protocol.serial) or
+                    self._current_stim is None or
+                    (self._current_stim.startswith('D') and
+                     not protocol.serial)),
                 label='output_no_learn')
-
 
             self.bias = nengo.Node(1.)
             self.output_learn = nengo.Ensemble(
@@ -139,9 +142,7 @@ class IMem(spa.Network):
             self.ctrl = Control(protocol, self.task_vocabs.items)
 
             # TCM
-            self.tcm = TCM(
-                self.task_vocabs, protocol, self.ctrl, beta,
-                recall_noise=recall_noise)
+            self.tcm = TCM(self.task_vocabs, self.ctrl, beta)
             nengo.Connection(self.ctrl.output_stimulus, self.tcm.input)
 
             # position counter
@@ -266,6 +267,56 @@ class IMem(spa.Network):
             inhibit_net(self.start_of_recall, self.ose_recall_gate)
             inhibit_net(self.start_of_recall, self.tcm.current_ctx.old.mem,
                         synapse=0.1, strength=5)
+
+            # Determining update progress
+            self.last_item = spa.State(self.task_vocabs.items, feedback=1.)
+            self.sim_th = SimilarityThreshold(self.task_vocabs.items)
+            nengo.Connection(
+                self.ctrl.output_stimulus, self.last_item.input, transform=1.,
+                synapse=0.1)
+            nengo.Connection(self.ctrl.output_stimulus, self.sim_th.input_a)
+            nengo.Connection(self.last_item.output, self.sim_th.input_b)
+            nengo.Connection(self.bias, self.tcm.input_update_context)
+            nengo.Connection(
+                self.sim_th.output, self.tcm.input_update_context,
+                transform=-1.)
+
+            # Recall networks
+            self.recall = NeuralAccumulatorDecisionProcess(
+                self.task_vocabs.items.create_subset(protocol.get_all_items()),
+                noise=recall_noise, min_evidence=.025, n_inputs=2)
+            self.recalled_gate = spa.State(self.task_vocabs.items)
+            nengo.Connection(self.recalled_gate.output, self.tcm.input)
+            recall_nets = [(self.recall, self.recalled_gate)]
+            if len(self.task_vocabs.positions) > 0:
+                self.pos_recall = NeuralAccumulatorDecisionProcess(
+                    self.task_vocabs.positions, noise=recall_noise)
+                self.pos_recalled_gate = spa.State(self.task_vocabs.items)
+                nengo.Connection(
+                    self.pos_recalled_gate.output, self.tcm.input_pos)
+                recall_nets.append((self.pos_recall, self.pos_recalled_gate))
+
+            self.tcm_recall_gate = spa.State(self.task_vocabs.items)
+            nengo.Connection(
+                self.tcm.output_recalled_item, self.recall_gate.input)
+            inhibit_net(self.ctrl.output_pres_phase, self.recall_gate)
+
+            for recall_net, recalled_gate in recall_nets:
+                nengo.Connection(
+                    self.recall_gate.output, recall_net.input_list[0])
+                inhibit_net(
+                    self.ctrl.output_serial_recall, recalled_gate, strength=6)
+                nengo.Connection(recall_net.output, recalled_gate.input)
+                nengo.Connection(recall_net.output, self.sim_th.input_a)
+                nengo.Connection(
+                    recall_net.output, self.last_item.input, transform=0.1,
+                    synapse=0.1)
+
+                inhibit_net(self.ctrl.output_pres_phase, recall_net.state)
+                inhibit_net(
+                    self.ctrl.output_pres_phase, recall_net.buf.mem,
+                    strength=6)
+                inhibit_net(self.ctrl.output_pres_phase, recall_net.inhibit)
 
             self.output = self.tcm.output
 
