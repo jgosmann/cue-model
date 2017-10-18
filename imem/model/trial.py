@@ -48,12 +48,12 @@ class IMemTrial(pytry.NengoTrial):
                 proto, self.vocabs, p.beta, p.gamma, p.noise,
                 p.ose_thr, p.ordinal_prob)
             self.p_recalls = nengo.Probe(model.imem.output, synapse=0.01)
+            self.p_pos = nengo.Probe(model.imem.output_pos, synapse=0.01)
 
             self.debug_probes = {
                 'recall_state': model.imem.tcm.recall.state.output,
                 'recall_threshold': model.imem.tcm.recall.threshold.heaviside,
                 'recall_buf': model.imem.tcm.recall.buf.output,
-                'pos': model.imem.pos.output,
                 'pos_recall_state': model.imem.tcm.pos_recall.state.output,
                 'pos_recall_buf': model.imem.tcm.pos_recall.buf.output,
                 'aml_comp': model.imem.tcm.net_m_tf.compare.output,
@@ -88,15 +88,29 @@ class IMemTrial(pytry.NengoTrial):
 
         recall_vocab = self.vocabs.items.create_subset(proto.get_all_items())
         similarity = spa.similarity(sim.data[self.p_recalls], recall_vocab)
-        above_threshold = similarity[np.max(similarity, axis=1) > 0.8, :]
         responses = []
-        for x in np.argmax(above_threshold, axis=1):
-            if x not in responses:
-                responses.append(float(x))
+        positions = np.arange(p.n_items)
+        if proto.serial:
+            for i in positions:
+                pos_sim = self.vocabs.positions["P" + str(i)].dot(
+                    sim.data[self.p_pos].T)
+                recall_phase = sim.trange() > proto.pres_phase_duration
+                t = sim.trange()[recall_phase & (pos_sim > 0.8)]
+                recall_for_pos = np.mean(similarity[t], axis=0)
+                if np.any(recall_for_pos > 0.8):
+                    responses.append(float(np.argmax(recall_for_pos)))
+                else:
+                    responses.append(np.nan)
+        else:
+            above_threshold = similarity[np.max(similarity, axis=1) > 0.8, :]
+            for x in np.argmax(above_threshold, axis=1):
+                if x not in responses:
+                    responses.append(float(x))
         responses = responses + (p.n_items - len(responses)) * [np.nan]
 
         result = {
             'responses': responses,
+            'positions': positions,
             'vocab_vectors': self.vocabs.items.vectors,
             'vocab_keys': list(self.vocabs.items.keys()),
             'pos_vectors': self.vocabs.positions.vectors,

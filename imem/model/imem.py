@@ -318,6 +318,9 @@ class IMem(spa.Network):
                     strength=6)
                 inhibit_net(self.ctrl.output_pres_phase, recall_net.inhibit)
 
-            self.output = self.tcm.output
+            self.output = self.recall.output
+            self.output_pos = self.pos.output
 
-        self.outputs = dict(default=(self.output, self.task_vocabs.items))
+        self.outputs = dict(
+            default=(self.output, self.task_vocabs.items),
+            output_pos=(self.output_pos, self.task_vocabs.positions))
