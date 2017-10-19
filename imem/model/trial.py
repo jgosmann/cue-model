@@ -45,8 +45,8 @@ class IMemTrial(pytry.NengoTrial):
 
         with spa.Network(seed=p.seed) as model:
             model.imem = IMem(
-                proto, self.vocabs, p.beta, p.gamma, p.noise,
-                p.ose_thr, p.ordinal_prob)
+                proto, self.vocabs, p.beta, p.gamma,
+                p.ose_thr, p.ordinal_prob, p.noise)
             self.p_recalls = nengo.Probe(model.imem.output, synapse=0.01)
             self.p_pos = nengo.Probe(model.imem.output_pos, synapse=0.01)
 
