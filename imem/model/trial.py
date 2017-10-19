@@ -73,6 +73,13 @@ class IMemTrial(pytry.NengoTrial):
                 'failed_recall': model.imem.recall.failed_recall,
                 'failed_recall_heaviside':
                     model.imem.recall.failed_recall_heaviside,
+                'start_of_recall': model.imem.start_of_recall,
+                'pos_state': model.imem.pos.state.output,
+                'pos_inhibit_threshold': model.imem.pos.inhibit_threshold.output,
+                'input_inc': model.imem.pos.input_inc,
+                'no_pos_count': model.imem.ctrl.output_no_pos_count,
+                'ose_recall_gate': model.imem.ose_recall_gate.output,
+                'tcm_recall_gate': model.imem.tcm_recall_gate.output,
             }
             if p.debug:
                 for k in self.debug_probes:
@@ -109,6 +116,8 @@ class IMemTrial(pytry.NengoTrial):
 
         result = {
             'responses': responses,
+            'pos': sim.data[self.p_pos],
+            'recalls': sim.data[self.p_recalls],
             'positions': positions,
             'vocab_vectors': self.vocabs.items.vectors,
             'vocab_keys': list(self.vocabs.items.keys()),
