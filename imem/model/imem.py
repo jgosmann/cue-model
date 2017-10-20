@@ -308,6 +308,8 @@ class IMem(spa.Network):
                 self.invert,
                 transform=-np.ones((1, self.task_vocabs.positions.dimensions)))
             inhibit_net(self.invert, self.pos_gate)
+            inhibit_net(self.ctrl.output_serial_recall, self.pos_gate)
+            inhibit_net(self.ctrl.output_serial_recall, self.pos_recall.buf)
 
             # Short term recall
             self.ose_recall_gate = spa.State(self.task_vocabs.items)
