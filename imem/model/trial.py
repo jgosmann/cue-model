@@ -62,11 +62,14 @@ class IMemTrial(pytry.NengoTrial):
                     model.imem.recall.failed_recall_heaviside,
                 'start_of_recall': model.imem.start_of_recall,
                 'pos_state': model.imem.pos.state.output,
+                'pos_state_in': model.imem.pos.state.input,
                 'pos_inhibit_threshold': model.imem.pos.inhibit_threshold.output,
+                'pos_advance_threshold': model.imem.pos.advance_threshold.output,
                 'input_inc': model.imem.pos.input_inc,
                 'no_pos_count': model.imem.ctrl.output_no_pos_count,
                 'ose_recall_gate': model.imem.ose_recall_gate.output,
                 'tcm_recall_gate': model.imem.tcm_recall_gate.output,
+                'pos_gate': model.imem.pos_gate.output,
             }
             if p.debug:
                 for k in self.debug_probes:
