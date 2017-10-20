@@ -53,9 +53,9 @@ class Control(nengo.Network):
             self.output_recall_phase = nengo.Node(
                 self.protocol.is_recall_phase, label='output_recall_phase')
             self.output_serial_recall = nengo.Node(
-                protocol.serial, label='output_serial_recall')
+                protocol.proto.serial, label='output_serial_recall')
             self.output_free_recall = nengo.Node(
-                not protocol.serial, label='output_serial_recall')
+                not protocol.proto.serial, label='output_serial_recall')
 
             self._current_stim = None
             self.output_no_learn = nengo.Node(
@@ -66,10 +66,10 @@ class Control(nengo.Network):
             self.output_no_pos_count = nengo.Node(
                 lambda t: (
                     (self.protocol.is_recall_phase(t) and
-                     not self.protocol.serial) or
+                     not self.protocol.proto.serial) or
                     self._current_stim is None or
                     (self._current_stim.startswith('D') and
-                     not protocol.serial)),
+                     not protocol.proto.serial)),
                 label='output_no_learn')
 
             self.bias = nengo.Node(1.)
@@ -102,7 +102,7 @@ class Vocabularies(FrozenObject):
     positions = VocabularyOrDimParam(
         'positions', optional=False, readonly=True)
 
-    def __init__(self, protocol, items, contexts, n_pos, rng=None):
+    def __init__(self, stim_provider, items, contexts, n_pos, rng=None):
         super(Vocabularies, self).__init__()
 
         vocabs = Config.default(spa.Network, 'vocabs')
@@ -116,9 +116,9 @@ class Vocabularies(FrozenObject):
         self.contexts = contexts
         self.positions = spa.Vocabulary(self.items.dimensions)
 
-        self.items.populate(';'.join(protocol.get_all_items()))
-        if protocol.n_distractors_per_epoch > 0:
-            self.items.populate(';'.join(protocol.get_all_distractors()))
+        self.items.populate(';'.join(stim_provider.get_all_items()))
+        if stim_provider.n_distractors_per_epoch > 0:
+            self.items.populate(';'.join(stim_provider.get_all_distractors()))
 
         for i in range(self.items.dimensions):
             self.contexts.populate('CTX' + str(i))

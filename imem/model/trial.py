@@ -1,33 +1,18 @@
 from __future__ import absolute_import
 
-from functools import partial
-
 import nengo
 import nengo_spa as spa
 import numpy as np
 import pytry
 
-from imem import protocols
 from imem.model import IMem, Vocabularies
+from imem.protocols import PROTOCOLS, StimulusProvider
 
 
 class IMemTrial(pytry.NengoTrial):
     # pylint: disable=attribute-defined-outside-init,arguments-differ
 
-    PROTOCOLS = {
-        'contdist': partial(protocols.Recall, pi=1.2, ipi=16., ri=16.),
-        'delayed': partial(protocols.Recall, pi=1.2, ipi=0., ri=16.),
-        'immed': partial(protocols.Recall, pi=1., ipi=0., ri=0.),
-        'serial': partial(protocols.Recall, pi=1., ipi=0., ri=0., serial=True),
-    }
-
-    @classmethod
-    def get_proto(cls, p):
-        return cls.PROTOCOLS[p.protocol](
-            n_items=p.n_items, distractor_rate=p.distractor_rate)
-
     def params(self):
-        self.param("List length to remember", n_items=12)
         self.param("item dimensionality", item_d=256)
         self.param("context dimensionality", context_d=256)
         self.param("contextual drift rate", beta=0.62676)
@@ -40,12 +25,14 @@ class IMemTrial(pytry.NengoTrial):
         self.param("recall duration", recall_duration=60.)
 
     def model(self, p):
-        proto = self.get_proto(p)
-        self.vocabs = Vocabularies(proto, p.item_d, p.context_d, p.n_items + 3)
+        self.proto = PROTOCOLS[p.protocol]
+        self.stim_provider = StimulusProvider(self.proto, p.distractor_rate)
+        self.vocabs = Vocabularies(
+            self.stim_provider, p.item_d, p.context_d, self.proto.n_items + 3)
 
         with spa.Network(seed=p.seed) as model:
             model.imem = IMem(
-                proto, self.vocabs, p.beta, p.gamma,
+                self.stim_provider, self.vocabs, p.beta, p.gamma,
                 p.ose_thr, p.ordinal_prob, p.noise)
             self.p_recalls = nengo.Probe(model.imem.output, synapse=0.01)
             self.p_pos = nengo.Probe(model.imem.output_pos, synapse=0.01)
@@ -89,22 +76,26 @@ class IMemTrial(pytry.NengoTrial):
         return model
 
     def evaluate(self, p, sim, plt):
-        proto = self.get_proto(p)
-        sim.run(proto.duration + p.recall_duration)
+        sim.run(self.proto.duration + p.recall_duration)
 
-        recall_vocab = self.vocabs.items.create_subset(proto.get_all_items())
+        recall_vocab = self.vocabs.items.create_subset(self.stim_provider.get_all_items())
         similarity = spa.similarity(sim.data[self.p_recalls], recall_vocab)
         responses = []
-        positions = np.arange(p.n_items)
-        if proto.serial:
+        positions = np.arange(self.proto.n_items)
+        if self.proto.serial:
             for i in positions:
-                pos_sim = self.vocabs.positions["P" + str(i)].dot(
-                    sim.data[self.p_pos].T)
-                recall_phase = sim.trange() > proto.pres_phase_duration
-                t = sim.trange()[recall_phase & (pos_sim > 0.8)]
-                recall_for_pos = np.mean(similarity[t], axis=0)
-                if np.any(recall_for_pos > 0.8):
-                    responses.append(float(np.argmax(recall_for_pos)))
+                recall_phase = sim.trange() > self.proto.pres_phase_duration
+                s = recall_phase & (sim.data[self.p_pos][:, i + 1] > 0.8)
+                if np.any(s):
+                    recall_for_pos = np.mean(similarity[s], axis=0)
+                else:
+                    recall_for_pos = np.array([0.])
+                if np.any(recall_for_pos > 0.6):
+                    recalled = float(np.argmax(recall_for_pos))
+                    if len(responses) == 0 or recalled != responses[-1]:
+                        responses.append(recalled)
+                    else:
+                        responses.append(np.nan)
                 else:
                     responses.append(np.nan)
         else:
@@ -112,7 +103,7 @@ class IMemTrial(pytry.NengoTrial):
             for x in np.argmax(above_threshold, axis=1):
                 if x not in responses:
                     responses.append(float(x))
-        responses = responses + (p.n_items - len(responses)) * [np.nan]
+        responses = responses + (self.proto.n_items - len(responses)) * [np.nan]
 
         result = {
             'responses': responses,
