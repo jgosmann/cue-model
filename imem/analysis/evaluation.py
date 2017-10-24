@@ -47,22 +47,24 @@ def melted_to_success_count(data):
 
 def evaluate(path):
     for proto_name, proto in PROTOCOLS.items():
-        # FIXME get rid of TCM prefix
-        proto_path = os.path.join(path, 'tcm_' + proto_name)
-        if os.path.exists(proto_path):
-            exp_data = read_exp_data(proto.exp_data)
-            model_data = DataRep(
-                'psyrun', store.load(locate_results_file(proto_path)))
+        try:
+            proto_path = os.path.join(path, proto_name)
+            if os.path.exists(proto_path):
+                exp_data = read_exp_data(proto.exp_data)
+                model_data = DataRep(
+                    'psyrun', store.load(locate_results_file(proto_path)))
 
-            if proto.serial:
-                fig = plt.figure(figsize=(6, 4))
-                evaluate_serial_recall(proto, exp_data, model_data, fig=fig)
-            else:
-                fig = plt.figure(figsize=(12, 8))
-                evaluate_free_recall(proto, exp_data, model_data, fig=fig)
+                if proto.serial:
+                    fig = plt.figure(figsize=(6, 4))
+                    evaluate_serial_recall(proto, exp_data, model_data, fig=fig)
+                else:
+                    fig = plt.figure(figsize=(12, 8))
+                    evaluate_free_recall(proto, exp_data, model_data, fig=fig)
 
-            fig.suptitle(path + ', ' + proto_name)
-            fig.tight_layout(rect=(.0, .0, 1., .95))
+                fig.suptitle(path + ', ' + proto_name)
+                fig.tight_layout(rect=(.0, .0, 1., .95))
+        except Exception as err:
+            warnings.warn(str(err))
 
 
 def evaluate_serial_recall(proto, exp_data, model_data, fig=None):
