@@ -84,7 +84,7 @@ def evaluate_free_recall(proto, exp_data, model_data, fig=None):
     evaluate_crp(
         proto, exp_data, model_data, ax=fig.add_subplot(2, 2, 3))
     evaluate_serial_pos_curve(
-        proto, exp_data, model_data, ax=fig.add_subplot(2, 2, 4))
+        proto, exp_data, model_data, strict=False, ax=fig.add_subplot(2, 2, 4))
 
 
 def evaluate_successful_recalls(proto, exp_data, model_data, ax=None):
@@ -134,13 +134,14 @@ def evaluate_crp(proto, exp_data, model_data, ax=None, limit=6):
     ax.legend()
 
 
-def evaluate_serial_pos_curve(proto, exp_data, model_data, ax=None):
+def evaluate_serial_pos_curve(
+        proto, exp_data, model_data, strict=True, ax=None):
     if ax is None:
         ax = plt.gca()
 
-    analysis.serial_pos_curve(exp_data).plot(
+    analysis.serial_pos_curve(exp_data, strict=strict).plot(
         marker='o', label="experimental", ax=ax)
-    analysis.serial_pos_curve(model_data).plot(
+    analysis.serial_pos_curve(model_data, strict=strict).plot(
         marker='o', label="model", ax=ax)
 
     ax.set_xlabel("Serial position")

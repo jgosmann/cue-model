@@ -95,6 +95,24 @@ def crp(recalls, limit=None):
     return crp_data
 
 
+@register_conversion('melted', 'serial-pos-strict')
+def melted_to_serial_pos_strict(data):
+    y = defaultdict(lambda: 0, {
+        i + 1: (
+            x['recalled_pos'] == i).sum() for i, x in data.groupby(level='pos')
+    })
+    for k in y:
+        y[k] /= float(len(data.index.get_level_values('trial').unique()))
+    return pd.DataFrame({
+        'correct': y
+    }, index=y.keys())
+
+
+@register_conversion('Jahnke68', 'serial-pos-strict')
+def jahnke68_to_serial_pos_strict(data):
+    return data
+
+
 @register_conversion('melted', 'serial-pos')
 def melted_to_serial_pos(data):
     y = defaultdict(lambda: 0)
@@ -108,12 +126,7 @@ def melted_to_serial_pos(data):
     }, index=y.keys())
 
 
-@register_conversion('Jahnke68', 'serial-pos')
-def jahnke68_to_serial_pos(data):
-    return data
-
-
-def serial_pos_curve(recalls):
+def serial_pos_curve(recalls, strict=True):
     """Serial position curve.
 
     Parameters
@@ -131,4 +144,5 @@ def serial_pos_curve(recalls):
     """
 
     # TODO update documentation + implementation
-    return convert(recalls, 'serial-pos').data
+    fmt = 'serial-pos-strict' if strict else 'serial-pos'
+    return convert(recalls, fmt).data
