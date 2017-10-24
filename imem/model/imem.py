@@ -194,6 +194,8 @@ class IMem(spa.Network):
                 self.irrelevant_pos_gate.output, self.tcm.input_pos)
 
             # Reset of position
+            # Happens only in serial recall and a certain fraction of free
+            # recalls.
             with nengo.presets.ThresholdingEnsembles(0.):
                 self.start_of_recall = nengo.Ensemble(50, 1)
             nengo.Connection(
