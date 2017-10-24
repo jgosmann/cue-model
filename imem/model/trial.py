@@ -21,6 +21,7 @@ class IMemTrial(pytry.NengoTrial):
         self.param("OSE memory threshold", ose_thr=0.2)
         self.param("TCM prob. to recall from beginning", ordinal_prob=0.2)
         self.param("noise in recall", noise=0.)
+        self.param("min. recall evidence", min_evidence=0.025)
         self.param("protocol", protocol='immed')
         self.param("recall duration", recall_duration=60.)
 
@@ -33,7 +34,7 @@ class IMemTrial(pytry.NengoTrial):
         with spa.Network(seed=p.seed) as model:
             model.imem = IMem(
                 self.stim_provider, self.vocabs, p.beta, p.gamma,
-                p.ose_thr, p.ordinal_prob, p.noise)
+                p.ose_thr, p.ordinal_prob, p.noise, p.min_evidence)
             self.p_recalls = nengo.Probe(model.imem.output, synapse=0.01)
             self.p_pos = nengo.Probe(model.imem.output_pos, synapse=0.01)
 

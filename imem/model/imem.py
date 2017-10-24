@@ -130,7 +130,7 @@ class Vocabularies(FrozenObject):
 class IMem(spa.Network):
     def __init__(
             self, protocol, task_vocabs, beta, gamma=0.9775, ose_thr=0.2,
-            ordinal_prob=0.2, recall_noise=0., **kwargs):
+            ordinal_prob=0.2, recall_noise=0., min_evidence=0.025, **kwargs):
         kwargs.setdefault('label', 'IMem')
         super(IMem, self).__init__(**kwargs)
 
@@ -248,7 +248,7 @@ class IMem(spa.Network):
             # Recall networks
             self.recall = NeuralAccumulatorDecisionProcess(
                 self.task_vocabs.items.create_subset(protocol.get_all_items()),
-                noise=recall_noise, min_evidence=.025, n_inputs=2)
+                noise=recall_noise, min_evidence=min_evidence, n_inputs=2)
             self.recalled_gate = spa.State(self.task_vocabs.items)
             nengo.Connection(self.recalled_gate.output, self.tcm.input)
 
