@@ -50,7 +50,7 @@ class GatedMemory(spa.Network):
         with self:
             self.diff = spa.State(self.vocab)
             self.mem = spa.State(
-                self.vocab, feedback=feedback, feedback_synapse=0.1)
+                self.vocab, feedback=feedback, feedback_synapse=feedback_syn)
             self.input_store = nengo.Node(size_in=1)
 
             nengo.Connection(
