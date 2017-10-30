@@ -163,6 +163,8 @@ class IMem(spa.Network):
                 nengo.Node(
                     lambda t: -np.exp(-t / 1.) if t < 12. else 0.),
                 self.tcm.net_m_tf.compare.threshold)
+            inhibit_net(self.ctrl.output_pres_phase, self.tcm.direct_ctx_gate)
+            inhibit_net(self.ctrl.output_free_recall, self.tcm.direct_ctx_gate)
 
             # Use irrelevant position vector to bind distractors
             self.in_pos_gate = spa.State(self.task_vocabs.positions)
