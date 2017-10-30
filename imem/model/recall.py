@@ -80,7 +80,7 @@ class NeuralAccumulatorDecisionProcess(spa.Network):
                 synapse=0.1)
 
             # Buffer for recalled item
-            self.buf = GatedMemory(self.vocab)
+            self.buf = GatedMemory(self.vocab, diff_scale=10.)
             nengo.Connection(
                 self.threshold.heaviside[:-1], self.buf.diff.input,
                 transform=self.vocab.vectors.T)
@@ -112,8 +112,13 @@ class NeuralAccumulatorDecisionProcess(spa.Network):
                 function=lambda x: x > 0)
             with nengo.presets.ThresholdingEnsembles(0.1):
                 self.inhib_thr = nengo.networks.EnsembleArray(50, n_items)
+            # nengo.Connection(
+                # self.inhibit.output, self.inhib_thr.input,
+                # transform=self.vocab.vectors)
+            self.out_inhibit_gate = GatedMemory(self.vocab)
+            nengo.Connection(self.inhibit.output, self.out_inhibit_gate.input)
             nengo.Connection(
-                self.inhibit.output, self.inhib_thr.input,
+                self.out_inhibit_gate.output, self.inhib_thr.input,
                 transform=self.vocab.vectors)
             nengo.Connection(
                 self.inhib_thr.output, self.state.input[:-1], transform=-6.)

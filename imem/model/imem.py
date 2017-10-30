@@ -229,13 +229,29 @@ class IMem(spa.Network):
                 synapse=0.1)
             nengo.Connection(self.ctrl.output_stimulus, self.sim_th.input_a)
             nengo.Connection(self.last_item.output, self.sim_th.input_b)
-            nengo.Connection(self.bias, self.tcm.input_update_context)
-            nengo.Connection(
-                self.sim_th.output, self.tcm.input_update_context,
-                transform=-1.)
 
+            with nengo.Config(nengo.Ensemble) as cfg:
+                cfg[nengo.Ensemble].eval_points = nengo.dists.Uniform(0, 1)
+                cfg[nengo.Ensemble].intercepts = nengo.dists.Uniform(0, 1)
+                self.sim_th_pos = nengo.Ensemble(50, 1)
+                self.sim_th_neg = nengo.Ensemble(50, 1)
+            nengo.Connection(self.sim_th.output, self.sim_th_pos)
+            nengo.Connection(self.sim_th.output, self.sim_th_neg)
+            nengo.Connection(self.ctrl.output_pres_phase, self.sim_th_pos.neurons, transform=-3. * np.ones((self.sim_th_pos.n_neurons, 1)))
+            nengo.Connection(self.ctrl.output_recall_phase, self.sim_th_neg.neurons, transform=-3. * np.ones((self.sim_th_neg.n_neurons, 1)))
+            nengo.Connection(self.sim_th_pos, self.pos.input_inc)
+            nengo.Connection(self.sim_th_neg, self.pos.input_inc, transform=-1)
+
+            nengo.Connection(self.ctrl.output_pres_phase, self.tcm.input_update_context)
             nengo.Connection(
-                self.sim_th.output, self.pos.input_inc, transform=-1)
+                self.sim_th_neg, self.tcm.input_update_context,
+                transform=-1.)  # FIXME ?
+            nengo.Connection(
+                self.sim_th_pos, self.tcm.input_update_context,
+                transform=1.)  # FIXME ?
+
+            # nengo.Connection(
+                # self.sim_th.output, self.pos.input_inc, transform=-1)
             nengo.Connection(self.sim_th.output, self.ose.input_store)
 
             nengo.Connection(self.bias, self.tcm.input_no_learn)
@@ -271,7 +287,7 @@ class IMem(spa.Network):
                 inhibit_net(
                     self.ctrl.output_serial_recall, recalled_gate, strength=6)
                 nengo.Connection(recall_net.output, recalled_gate.input)
-                nengo.Connection(recall_net.output, self.sim_th.input_a)
+                nengo.Connection(recall_net.output, self.sim_th.input_a, transform=1.2)
                 nengo.Connection(
                     recall_net.output, self.last_item.input, transform=0.1,
                     synapse=0.1)
@@ -281,6 +297,10 @@ class IMem(spa.Network):
                     self.ctrl.output_pres_phase, recall_net.buf.mem,
                     strength=6)
                 inhibit_net(self.ctrl.output_pres_phase, recall_net.inhibit)
+
+            nengo.Connection(self.bias, self.recall.out_inhibit_gate.input_store)
+            nengo.Connection(
+                self.sim_th.output, self.recall.out_inhibit_gate.input_store, transform=-1)
 
             # on failed recall increment pos and update context
             nengo.Connection(
