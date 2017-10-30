@@ -123,7 +123,7 @@ def melted_to_serial_pos(data):
         y[k] /= float(len(data.index.get_level_values('trial').unique()))
     return pd.DataFrame({
         'correct': y
-    }, index=y.keys())
+    }, index=y.keys()).sort_index()
 
 
 def serial_pos_curve(recalls, strict=True):
