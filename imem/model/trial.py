@@ -48,6 +48,7 @@ class IMemTrial(pytry.NengoTrial):
                 'ctx': model.imem.tcm.current_ctx.output,
                 'ctx_update': model.imem.tcm.current_ctx.input_update_context,
                 'inhib_recall': model.imem.recall.inhibit.output,
+                'out_inhibit_gate': model.imem.recall.out_inhibit_gate.output,
                 'recall_ctx': model.imem.tcm.net_m_ft.output,
                 'recall_ctx_cue': model.imem.tcm.net_m_ft.input_cue,
                 'input_pos': model.imem.tcm.input_pos,
@@ -71,6 +72,12 @@ class IMemTrial(pytry.NengoTrial):
                 'ose_recall_gate': model.imem.ose_recall_gate.output,
                 'tcm_recall_gate': model.imem.tcm_recall_gate.output,
                 'pos_gate': model.imem.pos_gate.output,
+                'ose': model.imem.ose.mem.output,
+                'buf_input_store': model.imem.recall.buf_input_store,
+                # 'out_inhib_gate_update': model.imem.recall.out_inhib_gate_update,
+                # 'input_update_inhibit': model.imem.recall.input_update_inhibit,
+                'sim_th_neg': model.imem.sim_th_neg,
+                'sim_th_pos': model.imem.sim_th_pos,
             }
             if p.debug:
                 for k in self.debug_probes:
