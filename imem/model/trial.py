@@ -89,9 +89,9 @@ class IMemTrial(pytry.NengoTrial):
         if self.proto.serial:
             for i in positions:
                 recall_phase = sim.trange() > self.proto.pres_phase_duration
-                s = recall_phase & (sim.data[self.p_pos][:, i + 1] > 0.8)
+                s = recall_phase & (sim.data[self.p_pos][:, i] > 0.8)
                 if np.any(s):
-                    recall_for_pos = np.mean(similarity[s], axis=0)
+                    recall_for_pos = similarity[s][-1, :]
                 else:
                     recall_for_pos = np.array([0.])
                 if np.any(recall_for_pos > 0.6):
