@@ -166,12 +166,17 @@ class IMem(spa.Network):
             inhibit_net(self.ctrl.output_pres_phase, self.tcm.direct_ctx_gate)
             inhibit_net(self.ctrl.output_free_recall, self.tcm.direct_ctx_gate)
 
-            self.serial_recall_phase = nengo.Node(size_in=1)
-            nengo.Connection(self.ctrl.output_serial_recall, self.serial_recall_phase)
+            self.serial_recall_phase = nengo.Ensemble(50, 1)
+            nengo.Connection(
+                self.ctrl.output_serial_recall, self.serial_recall_phase)
             nengo.Connection(
                 self.ctrl.output_pres_phase, self.serial_recall_phase,
                 transform=-1.)
             inhibit_net(self.serial_recall_phase, self.tcm.indirect_ctx_gate)
+            nengo.Connection(
+                self.ctrl.output_free_recall, self.serial_recall_phase.neurons,
+                transform=-3. * np.ones(
+                    (self.serial_recall_phase.n_neurons, 1)))
 
             # Use irrelevant position vector to bind distractors
             self.in_pos_gate = spa.State(self.task_vocabs.positions)
