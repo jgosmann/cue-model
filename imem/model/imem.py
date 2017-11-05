@@ -301,16 +301,21 @@ class IMem(spa.Network):
                 inhibit_net(
                     self.ctrl.output_serial_recall, recalled_gate, strength=6)
                 nengo.Connection(recall_net.output, recalled_gate.input)
-                nengo.Connection(recall_net.output, self.sim_th.input_a, transform=1.2)
-                nengo.Connection(
-                    recall_net.output, self.last_item.input, transform=0.1,
-                    synapse=0.1)
+                # nengo.Connection(recall_net.output, self.sim_th.input_a, transform=1.2)
+                # nengo.Connection(
+                    # recall_net.output, self.last_item.input, transform=0.1,
+                    # synapse=0.1)
 
                 inhibit_net(self.ctrl.output_pres_phase, recall_net.state)
                 inhibit_net(
                     self.ctrl.output_pres_phase, recall_net.buf.mem,
                     strength=6)
                 inhibit_net(self.ctrl.output_pres_phase, recall_net.inhibit)
+
+            nengo.Connection(self.recall.output, self.sim_th.input_a, transform=1.2)
+            nengo.Connection(
+                self.recall.output, self.last_item.input, transform=0.1,
+                synapse=0.1)
 
             nengo.Connection(self.bias, self.recall.out_inhibit_gate.input_store)
             nengo.Connection(
