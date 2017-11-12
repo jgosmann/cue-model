@@ -93,6 +93,7 @@ class IMemTrial(pytry.NengoTrial):
         similarity = spa.similarity(sim.data[self.p_recalls], recall_vocab)
         responses = []
         positions = np.arange(self.proto.n_items)
+        last_recall = -1
         if self.proto.serial:
             for i in positions:
                 recall_phase = sim.trange() > self.proto.pres_phase_duration
@@ -103,8 +104,9 @@ class IMemTrial(pytry.NengoTrial):
                     recall_for_pos = np.array([0.])
                 if np.any(recall_for_pos > 0.6):
                     recalled = float(np.argmax(recall_for_pos))
-                    if len(responses) == 0 or recalled != responses[-1]:
+                    if len(responses) == 0 or recalled != last_recall:
                         responses.append(recalled)
+                        last_recall = recalled
                     else:
                         responses.append(np.nan)
                 else:
