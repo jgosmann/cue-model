@@ -126,6 +126,12 @@ def melted_to_serial_pos(data):
     }, index=y.keys()).sort_index()
 
 
+def transpositions(data):
+    data = convert(data, 'melted').data.dropna()
+    x = data['recalled_pos'] - data.index.get_level_values('pos')
+    return x.values
+
+
 def serial_pos_curve(recalls, strict=True):
     """Serial position curve.
 

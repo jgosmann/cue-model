@@ -1,5 +1,6 @@
 from glob import glob
 import os.path
+import traceback
 import warnings
 
 import matplotlib.pyplot as plt
@@ -55,7 +56,7 @@ def evaluate(path):
                     'psyrun', store.load(locate_results_file(proto_path)))
 
                 if proto.serial:
-                    fig = plt.figure(figsize=(6, 4))
+                    fig = plt.figure(figsize=(12, 4))
                     evaluate_serial_recall(proto, exp_data, model_data, fig=fig)
                 else:
                     fig = plt.figure(figsize=(12, 8))
@@ -64,6 +65,7 @@ def evaluate(path):
                 fig.suptitle(path + ', ' + proto_name)
                 fig.tight_layout(rect=(.0, .0, 1., .95))
         except Exception as err:
+            traceback.print_exc()
             warnings.warn(str(err))
 
 
@@ -72,7 +74,9 @@ def evaluate_serial_recall(proto, exp_data, model_data, fig=None):
         fig = plt.gcf()
 
     evaluate_serial_pos_curve(
-        proto, exp_data, model_data, ax=fig.add_subplot(1, 1, 1))
+        proto, exp_data, model_data, ax=fig.add_subplot(1, 2, 1))
+    evaluate_transpositions(
+        proto, exp_data, model_data, ax=fig.add_subplot(1, 2, 2))
 
 
 def evaluate_free_recall(proto, exp_data, model_data, fig=None):
@@ -150,6 +154,13 @@ def evaluate_serial_pos_curve(
     ax.set_ylabel("Proportion correct recalls")
     ax.set_ylim(0, 1)
     ax.legend()
+
+
+def evaluate_transpositions(proto, exp_data, model_data, ax=None):
+    if ax is None:
+        ax = plt.gca()
+
+    ax.hist(analysis.transpositions(model_data), bins=13, range=(-6.5, 6.5))
 
 
 def plot_successful_recalls(
