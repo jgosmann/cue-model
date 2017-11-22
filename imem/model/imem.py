@@ -211,28 +211,41 @@ class IMem(spa.Network):
             # Happens only in serial recall and a certain fraction of free
             # recalls.
             with nengo.presets.ThresholdingEnsembles(0.):
-                self.start_of_recall = nengo.Ensemble(50, 1)
+                self.start_of_free_recall = nengo.Ensemble(50, 1)
+                self.start_of_serial_recall = nengo.Ensemble(50, 1)
             nengo.Connection(
-                self.ctrl.output_recall_phase, self.start_of_recall,
+                self.ctrl.output_recall_phase, self.start_of_free_recall,
                 synapse=0.05, transform=-1)
             nengo.Connection(
-                self.ctrl.output_recall_phase, self.start_of_recall,
+                self.ctrl.output_recall_phase, self.start_of_free_recall,
+                synapse=0.005)
+            nengo.Connection(
+                self.ctrl.output_recall_phase, self.start_of_serial_recall,
+                synapse=0.05, transform=-1)
+            nengo.Connection(
+                self.ctrl.output_recall_phase, self.start_of_serial_recall,
                 synapse=0.005)
             tr = -9 * np.ones((self.pos.input.size_in, 1))
             tr[0, 0] = 3.
             nengo.Connection(
-                self.start_of_recall, self.pos.input, transform=tr,
+                self.start_of_serial_recall, self.pos.input, transform=tr,
                 synapse=0.1)
             nengo.Connection(
-                self.start_of_recall, self.tcm.input_pos,
+                self.start_of_serial_recall, self.tcm.input_pos,
                 transform=np.atleast_2d(
                     self.task_vocabs.positions.vectors[0]).T,
                 synapse=0.1)
 
+            inhibit_net(self.start_of_free_recall, self.pos, strength=10.)
+
             # Certain fraction of recalls use ordinal strategy
             if np.random.rand() >= ordinal_prob:
                 nengo.Connection(
-                    self.ctrl.output_free_recall, self.start_of_recall,
+                    self.ctrl.output_free_recall, self.start_of_serial_recall,
+                    transform=-5.)
+            else:
+                nengo.Connection(
+                    self.ctrl.output_serial_recall, self.start_of_free_recall,
                     transform=-5.)
 
             # Determining update progress
@@ -363,8 +376,8 @@ class IMem(spa.Network):
                 transform=-np.ones(
                     (self.recall.inp_thrs[1].input.size_in, 1)))
             inhibit_net(self.ctrl.output_pres_phase, self.ose_recall_gate)
-            inhibit_net(self.start_of_recall, self.ose_recall_gate)
-            inhibit_net(self.start_of_recall, self.tcm.current_ctx.old.mem,
+            inhibit_net(self.start_of_serial_recall, self.ose_recall_gate)
+            inhibit_net(self.start_of_serial_recall, self.tcm.current_ctx.old.mem,
                         synapse=0.1, strength=5)
 
             self.output = self.recall.output
