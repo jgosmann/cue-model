@@ -2,8 +2,16 @@ from collections import defaultdict
 
 import numpy as np
 import pandas as pd
+from statsmodels.stats.proportion import proportion_confint
 
 from imem.analysis.conversion import convert, register_conversion
+
+
+def bootstrap_ci(data, func, n=3000, p=0.95):
+    index = int(n * (1. - p) / 2.)
+    r = func(np.random.choice(data, (n, len(data))), axis=1)
+    r = np.sort(r)
+    return r[index], r[-index]
 
 
 def p_first_recall(recalls):
@@ -21,12 +29,22 @@ def p_first_recall(recalls):
     """
     recalls = convert(recalls, 'melted').data
     hist = recalls.xs(0, level='pos').groupby('recalled_pos').size()
-    hist /= len(recalls.xs(0, level='pos'))
+    hist = hist.append(pd.Series(
+        {i: 0 for i in range(1, int(max(hist.index)) + 1)
+         if i not in hist.index}))
+    hist = hist.sort_index()
+    n = len(recalls.xs(0, level='pos'))
+    ci_low, ci_upp = proportion_confint(hist, n, method='beta')
+    hist /= n
+    hist = hist.to_frame(name='p_first')
+    hist['ci_low'] = hist['p_first'] - ci_low
+    hist['ci_upp'] = ci_upp - hist['p_first']
     hist.name = "Probabilitiy of first recall"
     return hist
 
 
-def crp(recalls, limit=None):
+# FIXME numerator can be larger than denominator
+def crp(recalls):
     """Conditional response probability.
 
     Parameters
@@ -35,8 +53,6 @@ def crp(recalls, limit=None):
         Pandas DataFrame with a column 'recalled_pos' denoting the recalled
         serial position with index levels 'trial' identifying the data
         collection trial and 'pos' denoting the output position.
-    limit : int
-        Limits the lags the CRP is calculated for.
 
     Returns
     -------
@@ -82,16 +98,24 @@ def crp(recalls, limit=None):
 
     denominator = recalls.reset_index().groupby('trial').apply(get_denom)
     denominator = denominator.reset_index().set_index(['trial', 'lag'])
-    if 'level_2' in denominator:
-        denominator = denominator.drop(['level_2'], axis=1)
+    for key in ('level_1', 'level_2'):
+        if key in denominator:
+            denominator = denominator.drop([key], axis=1)
     denominator = np.maximum(denominator, 1)
 
-    crp_data = (numerator['num'] / denominator['denom']).fillna(0).groupby(
-        level='lag').mean()
-    crp_data[0] = np.nan
+    df = pd.merge(
+        numerator, denominator, left_index=True, right_index=True,
+        how='right').fillna(0)
+    df['crp'] = (df['num'] / df['denom']).fillna(0.)
+    crp_data = df.groupby(level='lag').mean()
+    crp_data.loc[0, 'crp'] = np.nan
+    ci = df['crp'].groupby(level='lag').apply(
+        lambda x: pd.Series(bootstrap_ci(x, np.mean)))
+    crp_data['ci_low'] = crp_data['crp'] - ci.xs(0, level=1)
+    crp_data['ci_upp'] = ci.xs(1, level=1) - crp_data['crp']
+    # crp_data = (numerator['num'] / denominator['denom']).fillna(0).groupby(
+        # level='lag').mean()
     crp_data.name = "Conditional response probability"
-    if limit is not None:
-        crp_data = crp_data.loc[-limit:limit]
     return crp_data
 
 
@@ -101,11 +125,15 @@ def melted_to_serial_pos_strict(data):
         i + 1: (
             x['recalled_pos'] == i).sum() for i, x in data.groupby(level='pos')
     })
-    for k in y:
-        y[k] /= float(len(data.index.get_level_values('trial').unique()))
+    y = np.array([y[k] for k in range(1, max(y.keys()) + 1)])
+    n = len(data.index.get_level_values('trial').unique())
+    ci_low, ci_upp = proportion_confint(y, n, method='beta')
+    y = y / float(n)
     return pd.DataFrame({
-        'correct': y
-    }, index=y.keys())
+        'correct': y,
+        'ci_low': y - ci_low,
+        'ci_upp': ci_upp - y,
+    }, index=range(1, len(y) + 1))
 
 
 @register_conversion('Jahnke68', 'serial-pos-strict')
@@ -119,17 +147,30 @@ def melted_to_serial_pos(data):
     for _, x in data.iterrows():
         if np.isfinite(x['recalled_pos']):
             y[int(x['recalled_pos']) + 1] += 1
-    for k in y:
-        y[k] /= float(len(data.index.get_level_values('trial').unique()))
+    n = len(data.index.get_level_values('trial').unique())
+    y = np.array([y[k] for k in range(1, max(y.keys()) + 1)])
+    ci_low, ci_upp = proportion_confint(y, n, method='beta')
+    m = y / float(n)
     return pd.DataFrame({
-        'correct': y
-    }, index=y.keys()).sort_index()
+        'correct': m,
+        'ci_low': m - ci_low,
+        'ci_upp': ci_upp - m,
+    }, index=np.arange(1, len(y) + 1)).sort_index()
 
 
 def transpositions(data):
     data = convert(data, 'melted').data.dropna()
-    x = data['recalled_pos'] - data.index.get_level_values('pos')
-    return x.values
+    y = data['recalled_pos'] - data.index.get_level_values('pos')
+    h, edges = np.histogram(
+        y.values, np.arange(min(y.values) - 0.5, max(y.values) + 0.5))
+    x = np.asarray(edges[:-1] + 0.5 * np.diff(edges), dtype=int)
+    p = h / float(len(y))
+    ci_low, ci_upp = proportion_confint(h, len(y), method='beta')
+    return pd.DataFrame({
+        'p_transpose': p,
+        'ci_low': p - ci_low,
+        'ci_upp': ci_upp - p,
+    }, index=x)
 
 
 def serial_pos_curve(recalls, strict=True):
