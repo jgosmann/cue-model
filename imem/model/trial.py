@@ -62,7 +62,8 @@ class IMemTrial(pytry.NengoTrial):
                 'failed_recall': model.imem.recall.failed_recall,
                 'failed_recall_heaviside':
                     model.imem.recall.failed_recall_heaviside,
-                'start_of_recall': model.imem.start_of_recall,
+                'start_of_serial_recall': model.imem.start_of_serial_recall,
+                'start_of_free_recall': model.imem.start_of_free_recall,
                 'pos_state': model.imem.pos.state.output,
                 'pos_state_in': model.imem.pos.state.input,
                 'pos_inhibit_threshold': model.imem.pos.inhibit_threshold.output,
