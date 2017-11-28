@@ -87,7 +87,7 @@ def crp(recalls):
             'lag': np.arange(-n_pos + 1, n_pos),
             'denom': np.zeros(2 * n_pos - 1)})
         x = x.dropna().sort_values(by='pos')
-        for i in range(len(x) - 1):
+        for i in range(len(x)):
             row = x.iloc[i]
             pos = int(row['recalled_pos'])
             to_recall.remove(pos)
@@ -106,6 +106,7 @@ def crp(recalls):
     df = pd.merge(
         numerator, denominator, left_index=True, right_index=True,
         how='right').fillna(0)
+    assert (df['num'] <= df['denom']).all()
     df['crp'] = (df['num'] / df['denom']).fillna(0.)
     crp_data = df.groupby(level='lag').mean()
     crp_data.loc[0, 'crp'] = np.nan
