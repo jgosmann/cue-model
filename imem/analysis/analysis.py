@@ -114,8 +114,7 @@ def crp(recalls):
         lambda x: pd.Series(bootstrap_ci(x, np.mean)))
     crp_data['ci_low'] = crp_data['crp'] - ci.xs(0, level=1)
     crp_data['ci_upp'] = ci.xs(1, level=1) - crp_data['crp']
-    # crp_data = (numerator['num'] / denominator['denom']).fillna(0).groupby(
-        # level='lag').mean()
+
     crp_data.name = "Conditional response probability"
     return crp_data
 
