@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from psyrun.store import AutodetectStore
+from scipy.stats import kurtosis
 import seaborn as sns
 
 from imem.analysis import analysis
@@ -59,7 +60,7 @@ def evaluate(path):
                     fig = plt.figure(figsize=(12, 4))
                     evaluate_serial_recall(proto, exp_data, model_data, fig=fig)
                 else:
-                    fig = plt.figure(figsize=(12, 8))
+                    fig = plt.figure(figsize=(12, 12))
                     evaluate_free_recall(proto, exp_data, model_data, fig=fig)
 
                 fig.suptitle(path + ', ' + proto_name)
@@ -84,13 +85,19 @@ def evaluate_free_recall(proto, exp_data, model_data, fig=None):
         fig = plt.gcf()
 
     evaluate_successful_recalls(
-        proto, exp_data, model_data, ax=fig.add_subplot(2, 2, 1))
+        proto, exp_data, model_data, ax=fig.add_subplot(3, 2, 1))
+    evaluate_successful_recall_dist(
+        proto, exp_data, model_data, ax=fig.add_subplot(3, 2, 2))
     evaluate_p_first_recall(
-        proto, exp_data, model_data, ax=fig.add_subplot(2, 2, 2))
+        proto, exp_data, model_data, ax=fig.add_subplot(3, 2, 3))
     evaluate_crp(
-        proto, exp_data, model_data, ax=fig.add_subplot(2, 2, 3))
+        proto, exp_data, model_data, ax=fig.add_subplot(3, 2, 4))
     evaluate_serial_pos_curve(
-        proto, exp_data, model_data, strict=False, ax=fig.add_subplot(2, 2, 4))
+        proto, exp_data, model_data, strict=False, ax=fig.add_subplot(3, 2, 5))
+
+
+def aggregate_measure(data, fn):
+    return fn(data), analysis.bootstrap_ci(data, fn)
 
 
 def evaluate_successful_recalls(proto, exp_data, model_data, ax=None):
@@ -100,16 +107,36 @@ def evaluate_successful_recalls(proto, exp_data, model_data, ax=None):
         ax = plt.gca()
 
     plot_successful_recalls(
-        exp_data, proto.n_items, color=next(cp),
-        label="experimental", ax=ax)
+        exp_data, proto.n_items, color=next(cp), label="experimental", ax=ax)
     plot_successful_recalls(
-        model_data, proto.n_items, color=next(cp),
-        label="model", ax=ax)
+        model_data, proto.n_items, color=next(cp), label="model", ax=ax)
 
     ax.set_xlim(-0.5, proto.n_items + 0.5)
     ax.set_xlabel("# successful recalls")
     ax.set_ylabel("Proportion")
     ax.legend()
+
+
+def evaluate_successful_recall_dist(proto, exp_data, model_data, ax=None):
+    ev_exp_data = convert(exp_data, 'success_count')
+    ev_model_data = convert(model_data, 'success_count')
+    plot_dist_stats(ev_exp_data.data, ax)
+    plot_dist_stats(ev_model_data.data, ax)
+
+
+def plot_dist_stats(data, ax=None):
+    if ax is None:
+        ax = plt.gca()
+
+    mean, (mean_l, mean_u) = aggregate_measure(data, np.mean)
+    std, (std_l, std_u) = aggregate_measure(data, np.std)
+    kur, (kur_l, kur_u) = aggregate_measure(data, kurtosis)
+
+    ax.errorbar(range(3), [mean, std, kur], yerr=[
+        [mean - mean_l, std - std_l, kur - kur_l],
+        [mean_u - mean, std_u - std, kur_u - kur]], marker='o')
+    # TODO remove lines
+    # TODO label plot
 
 
 def evaluate_p_first_recall(proto, exp_data, model_data, ax=None):
