@@ -43,7 +43,6 @@ def p_first_recall(recalls):
     return hist
 
 
-# FIXME numerator can be larger than denominator
 def crp(recalls):
     """Conditional response probability.
 
