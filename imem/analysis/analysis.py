@@ -19,18 +19,7 @@ def aggregate_measure(data, fn):
 
 
 def p_first_recall(recalls):
-    """Probability of first recall.
-
-    Parameters
-    ----------
-    recalls : pandas.DataFrame
-        Pandas DataFrame with a column 'recalled_pos' denoting the recalled
-        serial position with an index level 'pos' denoting the output position.
-
-    Returns
-    -------
-    pandas.DataFrame
-    """
+    """Probability of first recall."""
     recalls = convert(recalls, 'melted').data
     hist = recalls.xs(0, level='pos').groupby('recalled_pos').size()
     hist = hist.append(pd.Series(
@@ -48,19 +37,7 @@ def p_first_recall(recalls):
 
 
 def crp(recalls):
-    """Conditional response probability.
-
-    Parameters
-    ----------
-    recalls : pandas.DataFrame
-        Pandas DataFrame with a column 'recalled_pos' denoting the recalled
-        serial position with index levels 'trial' identifying the data
-        collection trial and 'pos' denoting the output position.
-
-    Returns
-    -------
-    pandas.DataFrame
-    """
+    """Conditional response probability."""
     recalls = convert(recalls, 'melted').data
 
     def exclude_repetitions(x):
@@ -138,23 +115,7 @@ def transpositions(data):
 
 
 def serial_pos_curve(recalls, strict=True):
-    """Serial position curve.
-
-    Parameters
-    ----------
-    recalls : pandas.DataFrame
-        Pandas DataFrame with a column 'recalled_pos' denoting the recalled
-        serial position with index levels 'trial' identifying the data
-        collection trial and 'pos' denoting the output position.
-    n_items : int
-        Number of items presented in the list.
-
-    Returns
-    -------
-    pandas.DataFrame
-    """
-
-    # TODO update documentation + implementation
+    """Serial position curve."""
     fmt = 'serial-pos-strict' if strict else 'serial-pos'
     return convert(recalls, fmt).data
 
