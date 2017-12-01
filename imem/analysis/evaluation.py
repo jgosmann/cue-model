@@ -5,46 +5,17 @@ import warnings
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 from psyrun.store import AutodetectStore
 from scipy.stats import kurtosis
 import seaborn as sns
 
 from imem.analysis import analysis
-from imem.analysis.conversion import convert, DataRep, register_conversion
+from imem.analysis.conversion import convert, DataRep
 from imem.analysis.io import read_exp_data
 from imem.protocols import PROTOCOLS
 
 
 store = AutodetectStore()
-
-
-@register_conversion('HowaKaha99', 'melted')
-def HowaKaha99_to_melted(data):
-    return data
-
-
-@register_conversion('psyrun', 'psyrun-df')
-def psyrun_to_psyrun_df(data):
-    d = {
-        i: np.asarray(data['responses'], dtype=float)[:, i]
-        for i in range(np.asarray(data['responses']).shape[1])}
-    d['seed'] = data['seed']
-    d['trial'] = data['trial']
-    return pd.DataFrame(d)
-
-
-@register_conversion('psyrun-df', 'melted')
-def psyrun_df_to_melted(data):
-    return pd.melt(
-        pd.DataFrame(data), id_vars=['seed', 'trial'],
-        var_name='pos', value_name='recalled_pos').set_index(['trial', 'pos'])
-
-
-@register_conversion('melted', 'success_count')
-def melted_to_success_count(data):
-    data = data['recalled_pos']
-    return np.squeeze((data >= 0.).groupby(level='trial').sum().values)
 
 
 def evaluate(path):
@@ -58,7 +29,8 @@ def evaluate(path):
 
                 if proto.serial:
                     fig = plt.figure(figsize=(12, 4))
-                    evaluate_serial_recall(proto, exp_data, model_data, fig=fig)
+                    evaluate_serial_recall(
+                        proto, exp_data, model_data, fig=fig)
                 else:
                     fig = plt.figure(figsize=(12, 12))
                     evaluate_free_recall(proto, exp_data, model_data, fig=fig)
@@ -96,10 +68,6 @@ def evaluate_free_recall(proto, exp_data, model_data, fig=None):
         proto, exp_data, model_data, strict=False, ax=fig.add_subplot(3, 2, 5))
 
 
-def aggregate_measure(data, fn):
-    return fn(data), analysis.bootstrap_ci(data, fn)
-
-
 def evaluate_successful_recalls(proto, exp_data, model_data, ax=None):
     cp = iter(sns.color_palette())
 
@@ -122,21 +90,6 @@ def evaluate_successful_recall_dist(proto, exp_data, model_data, ax=None):
     ev_model_data = convert(model_data, 'success_count')
     plot_dist_stats(ev_exp_data.data, ax)
     plot_dist_stats(ev_model_data.data, ax)
-
-
-def plot_dist_stats(data, ax=None):
-    if ax is None:
-        ax = plt.gca()
-
-    mean, (mean_l, mean_u) = aggregate_measure(data, np.mean)
-    std, (std_l, std_u) = aggregate_measure(data, np.std)
-    kur, (kur_l, kur_u) = aggregate_measure(data, kurtosis)
-
-    ax.errorbar(range(3), [mean, std, kur], yerr=[
-        [mean - mean_l, std - std_l, kur - kur_l],
-        [mean_u - mean, std_u - std, kur_u - kur]], marker='o')
-    # TODO remove lines
-    # TODO label plot
 
 
 def evaluate_p_first_recall(proto, exp_data, model_data, ax=None):
@@ -228,6 +181,21 @@ def plot_successful_recalls(
     if label is not None:
         label = label + ' (mean)'
     ax.axvline(x=np.mean(n_successfull.data), label=label, **kwargs)
+
+
+def plot_dist_stats(data, ax=None):
+    if ax is None:
+        ax = plt.gca()
+
+    mean, (mean_l, mean_u) = analysis.aggregate_measure(data, np.mean)
+    std, (std_l, std_u) = analysis.aggregate_measure(data, np.std)
+    kur, (kur_l, kur_u) = analysis.aggregate_measure(data, kurtosis)
+
+    ax.errorbar(range(3), [mean, std, kur], yerr=[
+        [mean - mean_l, std - std_l, kur - kur_l],
+        [mean_u - mean, std_u - std, kur_u - kur]], marker='o')
+    # TODO remove lines
+    # TODO label plot
 
 
 def locate_results_file(path):

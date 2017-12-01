@@ -14,6 +14,10 @@ def bootstrap_ci(data, func, n=3000, p=0.95):
     return r[index], r[-index]
 
 
+def aggregate_measure(data, fn):
+    return fn(data), bootstrap_ci(data, fn)
+
+
 def p_first_recall(recalls):
     """Probability of first recall.
 
@@ -118,6 +122,43 @@ def crp(recalls):
     return crp_data
 
 
+def transpositions(data):
+    data = convert(data, 'melted').data.dropna()
+    y = data['recalled_pos'] - data.index.get_level_values('pos')
+    h, edges = np.histogram(
+        y.values, np.arange(min(y.values) - 0.5, max(y.values) + 0.5))
+    x = np.asarray(edges[:-1] + 0.5 * np.diff(edges), dtype=int)
+    p = h / float(len(y))
+    ci_low, ci_upp = proportion_confint(h, len(y), method='beta')
+    return pd.DataFrame({
+        'p_transpose': p,
+        'ci_low': p - ci_low,
+        'ci_upp': ci_upp - p,
+    }, index=x)
+
+
+def serial_pos_curve(recalls, strict=True):
+    """Serial position curve.
+
+    Parameters
+    ----------
+    recalls : pandas.DataFrame
+        Pandas DataFrame with a column 'recalled_pos' denoting the recalled
+        serial position with index levels 'trial' identifying the data
+        collection trial and 'pos' denoting the output position.
+    n_items : int
+        Number of items presented in the list.
+
+    Returns
+    -------
+    pandas.DataFrame
+    """
+
+    # TODO update documentation + implementation
+    fmt = 'serial-pos-strict' if strict else 'serial-pos'
+    return convert(recalls, fmt).data
+
+
 @register_conversion('melted', 'serial-pos-strict')
 def melted_to_serial_pos_strict(data):
     y = defaultdict(lambda: 0, {
@@ -157,38 +198,29 @@ def melted_to_serial_pos(data):
     }, index=np.arange(1, len(y) + 1)).sort_index()
 
 
-def transpositions(data):
-    data = convert(data, 'melted').data.dropna()
-    y = data['recalled_pos'] - data.index.get_level_values('pos')
-    h, edges = np.histogram(
-        y.values, np.arange(min(y.values) - 0.5, max(y.values) + 0.5))
-    x = np.asarray(edges[:-1] + 0.5 * np.diff(edges), dtype=int)
-    p = h / float(len(y))
-    ci_low, ci_upp = proportion_confint(h, len(y), method='beta')
-    return pd.DataFrame({
-        'p_transpose': p,
-        'ci_low': p - ci_low,
-        'ci_upp': ci_upp - p,
-    }, index=x)
+@register_conversion('HowaKaha99', 'melted')
+def HowaKaha99_to_melted(data):
+    return data
 
 
-def serial_pos_curve(recalls, strict=True):
-    """Serial position curve.
+@register_conversion('psyrun', 'psyrun-df')
+def psyrun_to_psyrun_df(data):
+    d = {
+        i: np.asarray(data['responses'], dtype=float)[:, i]
+        for i in range(np.asarray(data['responses']).shape[1])}
+    d['seed'] = data['seed']
+    d['trial'] = data['trial']
+    return pd.DataFrame(d)
 
-    Parameters
-    ----------
-    recalls : pandas.DataFrame
-        Pandas DataFrame with a column 'recalled_pos' denoting the recalled
-        serial position with index levels 'trial' identifying the data
-        collection trial and 'pos' denoting the output position.
-    n_items : int
-        Number of items presented in the list.
 
-    Returns
-    -------
-    pandas.DataFrame
-    """
+@register_conversion('psyrun-df', 'melted')
+def psyrun_df_to_melted(data):
+    return pd.melt(
+        pd.DataFrame(data), id_vars=['seed', 'trial'],
+        var_name='pos', value_name='recalled_pos').set_index(['trial', 'pos'])
 
-    # TODO update documentation + implementation
-    fmt = 'serial-pos-strict' if strict else 'serial-pos'
-    return convert(recalls, fmt).data
+
+@register_conversion('melted', 'success_count')
+def melted_to_success_count(data):
+    data = data['recalled_pos']
+    return np.squeeze((data >= 0.).groupby(level='trial').sum().values)
