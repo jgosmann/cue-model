@@ -243,7 +243,13 @@ class IMem(spa.Network):
                 nengo.Connection(
                     self.ctrl.output_free_recall, self.start_of_serial_recall,
                     transform=-5.)
+                nengo.Connection(
+                    self.ctrl.output_serial_recall, self.start_of_free_recall,
+                    transform=-5.)
             else:
+                nengo.Connection(
+                    self.ctrl.output_free_recall, self.start_of_free_recall,
+                    transform=-5.)
                 nengo.Connection(
                     self.ctrl.output_serial_recall, self.start_of_free_recall,
                     transform=-5.)
@@ -379,6 +385,9 @@ class IMem(spa.Network):
             inhibit_net(self.start_of_serial_recall, self.ose_recall_gate)
             inhibit_net(self.start_of_serial_recall, self.tcm.current_ctx.old.mem,
                         synapse=0.1, strength=5)
+            nengo.Connection(
+                self.start_of_serial_recall, self.tcm.input_update_context,
+                synapse=0.1, transform=5)
 
             self.output = self.recall.output
             self.output_pos = self.pos.output
