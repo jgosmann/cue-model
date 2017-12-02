@@ -336,9 +336,11 @@ class IMem(spa.Network):
                 self.recall.output, self.last_item.input, transform=0.1,
                 synapse=0.1)
 
-            nengo.Connection(self.bias, self.recall.out_inhibit_gate.input_store)
             nengo.Connection(
-                self.sim_th.output, self.recall.out_inhibit_gate.input_store, transform=-1)
+                self.bias, self.recall.out_inhibit_gate.input_store)
+            nengo.Connection(
+                self.sim_th.output, self.recall.out_inhibit_gate.input_store,
+                transform=-1)
 
             # on failed recall increment pos and update context
             nengo.Connection(
