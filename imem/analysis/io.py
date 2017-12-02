@@ -2,6 +2,7 @@ import os.path
 
 import numpy as np
 import pandas as pd
+from statsmodels.stats.proportion import proportion_confint
 
 from imem.analysis.conversion import DataRep
 
@@ -68,6 +69,10 @@ def read_Jahnke68(filename):
     data = pd.read_csv(filename, header=0, names=['pos', 'correct'])
     data['pos'] = data['pos'].round().astype(int)
     data = data.set_index('pos')
+    n = 96
+    ci_low, ci_upp = proportion_confint(data['correct'] * n, n, method='beta')
+    data['ci_low'] = data['correct'] - ci_low
+    data['ci_upp'] = ci_upp - data['correct']
     return data
 
 

@@ -5,45 +5,17 @@ import warnings
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 from psyrun.store import AutodetectStore
+from scipy.stats import kurtosis
 import seaborn as sns
 
 from imem.analysis import analysis
-from imem.analysis.conversion import convert, DataRep, register_conversion
+from imem.analysis.conversion import convert, DataRep
 from imem.analysis.io import read_exp_data
 from imem.protocols import PROTOCOLS
 
 
 store = AutodetectStore()
-
-
-@register_conversion('HowaKaha99', 'melted')
-def HowaKaha99_to_melted(data):
-    return data
-
-
-@register_conversion('psyrun', 'psyrun-df')
-def psyrun_to_psyrun_df(data):
-    d = {
-        i: np.asarray(data['responses'], dtype=float)[:, i]
-        for i in range(np.asarray(data['responses']).shape[1])}
-    d['seed'] = data['seed']
-    d['trial'] = data['trial']
-    return pd.DataFrame(d)
-
-
-@register_conversion('psyrun-df', 'melted')
-def psyrun_df_to_melted(data):
-    return pd.melt(
-        pd.DataFrame(data), id_vars=['seed', 'trial'],
-        var_name='pos', value_name='recalled_pos').set_index(['trial', 'pos'])
-
-
-@register_conversion('melted', 'success_count')
-def melted_to_success_count(data):
-    data = data['recalled_pos']
-    return np.squeeze((data >= 0.).groupby(level='trial').sum().values)
 
 
 def evaluate(path):
@@ -57,9 +29,10 @@ def evaluate(path):
 
                 if proto.serial:
                     fig = plt.figure(figsize=(12, 4))
-                    evaluate_serial_recall(proto, exp_data, model_data, fig=fig)
+                    evaluate_serial_recall(
+                        proto, exp_data, model_data, fig=fig)
                 else:
-                    fig = plt.figure(figsize=(12, 8))
+                    fig = plt.figure(figsize=(12, 12))
                     evaluate_free_recall(proto, exp_data, model_data, fig=fig)
 
                 fig.suptitle(path + ', ' + proto_name)
@@ -84,13 +57,15 @@ def evaluate_free_recall(proto, exp_data, model_data, fig=None):
         fig = plt.gcf()
 
     evaluate_successful_recalls(
-        proto, exp_data, model_data, ax=fig.add_subplot(2, 2, 1))
+        proto, exp_data, model_data, ax=fig.add_subplot(3, 2, 1))
+    evaluate_successful_recall_dist(
+        proto, exp_data, model_data, ax=fig.add_subplot(3, 2, 2))
     evaluate_p_first_recall(
-        proto, exp_data, model_data, ax=fig.add_subplot(2, 2, 2))
+        proto, exp_data, model_data, ax=fig.add_subplot(3, 2, 3))
     evaluate_crp(
-        proto, exp_data, model_data, ax=fig.add_subplot(2, 2, 3))
+        proto, exp_data, model_data, ax=fig.add_subplot(3, 2, 4))
     evaluate_serial_pos_curve(
-        proto, exp_data, model_data, strict=False, ax=fig.add_subplot(2, 2, 4))
+        proto, exp_data, model_data, strict=False, ax=fig.add_subplot(3, 2, 5))
 
 
 def evaluate_successful_recalls(proto, exp_data, model_data, ax=None):
@@ -100,11 +75,9 @@ def evaluate_successful_recalls(proto, exp_data, model_data, ax=None):
         ax = plt.gca()
 
     plot_successful_recalls(
-        exp_data, proto.n_items, color=next(cp),
-        label="experimental", ax=ax)
+        exp_data, proto.n_items, color=next(cp), label="experimental", ax=ax)
     plot_successful_recalls(
-        model_data, proto.n_items, color=next(cp),
-        label="model", ax=ax)
+        model_data, proto.n_items, color=next(cp), label="model", ax=ax)
 
     ax.set_xlim(-0.5, proto.n_items + 0.5)
     ax.set_xlabel("# successful recalls")
@@ -112,29 +85,53 @@ def evaluate_successful_recalls(proto, exp_data, model_data, ax=None):
     ax.legend()
 
 
+def evaluate_successful_recall_dist(proto, exp_data, model_data, ax=None):
+    ev_exp_data = convert(exp_data, 'success_count')
+    ev_model_data = convert(model_data, 'success_count')
+    plot_dist_stats(ev_exp_data.data, ax)
+    plot_dist_stats(ev_model_data.data, ax)
+
+
 def evaluate_p_first_recall(proto, exp_data, model_data, ax=None):
     if ax is None:
         ax = plt.gca()
 
-    analysis.p_first_recall(exp_data).plot(
-        marker='o', label="experimental", ax=ax)
-    analysis.p_first_recall(model_data).plot(
-        marker='o', label="model", ax=ax)
+    ev_exp_data = analysis.p_first_recall(exp_data)
+    ev_exp_data['p_first'].plot(
+        marker='o', label="experimental", ax=ax,
+        yerr=ev_exp_data[['ci_low', 'ci_upp']].values.T)
+    ev_model_data = analysis.p_first_recall(model_data)
+    ev_model_data['p_first'].plot(
+        marker='o', label="model", ax=ax,
+        yerr=ev_model_data[['ci_low', 'ci_upp']].values.T)
 
     ax.set_xlabel("Serial position")
     ax.set_ylabel("Probability of first recall")
     ax.legend()
+    ax.set_ylim(bottom=0.)
 
 
 def evaluate_crp(proto, exp_data, model_data, ax=None, limit=6):
     if ax is None:
         ax = plt.gca()
 
-    analysis.crp(exp_data, limit=limit).plot(
-        marker='o', label="experimental", ax=ax)
-    analysis.crp(model_data, limit=limit).plot(
-        marker='o', label="model", ax=ax)
+    with warnings.catch_warnings():
+        # Warning generated by plotting and I am not sure why. It doesn't seem
+        # to effect anything, though.
+        warnings.filterwarnings(
+            'ignore', '.*converting a masked element to nan.*')
 
+        ev_exp_data = analysis.crp(exp_data)
+        ev_exp_data['crp'].plot(
+            marker='o', label="experimental", ax=ax,
+            yerr=np.copy(ev_exp_data[['ci_low', 'ci_upp']].values.T))
+
+        ev_model_data = analysis.crp(model_data)
+        ev_model_data['crp'].plot(
+            marker='o', label="model", ax=ax,
+            yerr=np.copy(ev_model_data[['ci_low', 'ci_upp']].values.T))
+
+    ax.set_xlim(-limit, limit)
     ax.set_xlabel("Lag position")
     ax.set_ylabel("CRP")
     ax.legend()
@@ -145,10 +142,14 @@ def evaluate_serial_pos_curve(
     if ax is None:
         ax = plt.gca()
 
-    analysis.serial_pos_curve(exp_data, strict=strict).plot(
-        marker='o', label="experimental", ax=ax)
-    analysis.serial_pos_curve(model_data, strict=strict).plot(
-        marker='o', label="model", ax=ax)
+    ev_exp_data = analysis.serial_pos_curve(exp_data, strict=strict)
+    ev_exp_data['correct'].plot(
+        marker='o', label="experimental", ax=ax,
+        yerr=ev_exp_data[['ci_low', 'ci_upp']].values.T)
+    ev_model_data = analysis.serial_pos_curve(model_data, strict=strict)
+    ev_model_data['correct'].plot(
+        marker='o', label="model", ax=ax,
+        yerr=ev_model_data[['ci_low', 'ci_upp']].values.T)
 
     ax.set_xlabel("Serial position")
     ax.set_ylabel("Proportion correct recalls")
@@ -160,7 +161,13 @@ def evaluate_transpositions(proto, exp_data, model_data, ax=None):
     if ax is None:
         ax = plt.gca()
 
-    ax.hist(analysis.transpositions(model_data), bins=13, range=(-6.5, 6.5))
+    data = analysis.transpositions(model_data)
+    ax.bar(
+        data.index, data['p_transpose'],
+        width=1., color=sns.color_palette()[0],
+        yerr=data[['ci_low', 'ci_upp']].values.T)
+    lim = np.max(np.abs(data.index.values))
+    ax.set_xlim(-lim, lim)
 
 
 def plot_successful_recalls(
@@ -174,6 +181,21 @@ def plot_successful_recalls(
     if label is not None:
         label = label + ' (mean)'
     ax.axvline(x=np.mean(n_successfull.data), label=label, **kwargs)
+
+
+def plot_dist_stats(data, ax=None):
+    if ax is None:
+        ax = plt.gca()
+
+    mean, (mean_l, mean_u) = analysis.aggregate_measure(data, np.mean)
+    std, (std_l, std_u) = analysis.aggregate_measure(data, np.std)
+    kur, (kur_l, kur_u) = analysis.aggregate_measure(data, kurtosis)
+
+    ax.errorbar(range(3), [mean, std, kur], yerr=[
+        [mean - mean_l, std - std_l, kur - kur_l],
+        [mean_u - mean, std_u - std, kur_u - kur]], marker='o')
+    # TODO remove lines
+    # TODO label plot
 
 
 def locate_results_file(path):
