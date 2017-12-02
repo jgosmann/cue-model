@@ -375,7 +375,7 @@ class IMem(spa.Network):
 
             # Short term recall
             self.ose_recall_gate = spa.State(self.task_vocabs.items)
-            nengo.Connection(self.ose.output, self.ose_recall_gate.input)
+            nengo.Connection(self.ose.output, self.ose_recall_gate.input, transform=0.5)
             nengo.Connection(
                 self.ose_recall_gate.output, self.recall.input_list[1])
             self.ose_recall_threshold = nengo.Node(ose_thr)
