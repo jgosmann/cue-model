@@ -74,19 +74,7 @@ class TCM(spa.Network):
             nengo.Connection(
                 self.current_ctx.output, self.net_m_ft.input_target)
             nengo.Connection(self.net_m_ft.output, self.current_ctx.input)
-            # nengo.Connection(self.current_ctx.output, self.net_m_tf.input_cue)
-
-            self.indirect_ctx_gate = spa.State(self.task_vocabs.contexts)
-            nengo.Connection(
-                self.current_ctx.output, self.indirect_ctx_gate.input)
-            nengo.Connection(
-                self.indirect_ctx_gate.output, self.net_m_tf.input_cue)
-
-            self.direct_ctx_gate = spa.State(self.task_vocabs.contexts)
-            nengo.Connection(self.net_m_ft.output, self.direct_ctx_gate.input)
-            nengo.Connection(
-                self.direct_ctx_gate.output, self.net_m_tf.input_cue,
-                transform=0.5)
+            nengo.Connection(self.current_ctx.output, self.net_m_tf.input_cue)
 
             # Control of learning
             self.input_no_learn = nengo.Node(size_in=1)

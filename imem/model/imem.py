@@ -163,8 +163,6 @@ class IMem(spa.Network):
                 nengo.Node(
                     lambda t: -np.exp(-t / 1.) if t < 12. else 0.),
                 self.tcm.net_m_tf.compare.threshold)
-            inhibit_net(self.ctrl.output_pres_phase, self.tcm.direct_ctx_gate)
-            inhibit_net(self.ctrl.output_free_recall, self.tcm.direct_ctx_gate)
 
             self.serial_recall_phase = nengo.Ensemble(50, 1)
             nengo.Connection(
@@ -172,7 +170,6 @@ class IMem(spa.Network):
             nengo.Connection(
                 self.ctrl.output_pres_phase, self.serial_recall_phase,
                 transform=-1.)
-            inhibit_net(self.serial_recall_phase, self.tcm.indirect_ctx_gate)
             nengo.Connection(
                 self.ctrl.output_free_recall, self.serial_recall_phase.neurons,
                 transform=-3. * np.ones(
