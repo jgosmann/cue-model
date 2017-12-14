@@ -299,24 +299,26 @@ class IMem(spa.Network):
             nengo.Connection(self.recalled_gate.output, self.tcm.input)
 
             self.pos_recall = NeuralAccumulatorDecisionProcess(
-                self.task_vocabs.positions, noise=recall_noise)
-            self.pos_recalled_gate = spa.State(self.task_vocabs.items)
-            nengo.Connection(
-                self.pos_recalled_gate.output, self.tcm.input_pos)
+                self.task_vocabs.positions, noise=recall_noise,
+                min_evidence=min_evidence)
+            # self.pos_recalled_gate = spa.State(self.task_vocabs.items)
+            # nengo.Connection(
+                # self.pos_recalled_gate.output, self.tcm.input_pos)
 
             self.tcm_recall_gate = spa.State(self.task_vocabs.items)
             nengo.Connection(
                 self.tcm.output_recalled_item, self.tcm_recall_gate.input)
             inhibit_net(self.ctrl.output_pres_phase, self.tcm_recall_gate)
 
-            for recall_net, recalled_gate in (
-                    (self.recall, self.recalled_gate),
-                    (self.pos_recall, self.pos_recalled_gate)):
+            inhibit_net(
+                self.ctrl.output_serial_recall, self.recalled_gate, strength=6)
+            nengo.Connection(self.recall.output, self.recalled_gate.input)
+            for recall_net in (self.recall, self.pos_recall):
                 nengo.Connection(
                     self.tcm_recall_gate.output, recall_net.input_list[0])
-                inhibit_net(
-                    self.ctrl.output_serial_recall, recalled_gate, strength=6)
-                nengo.Connection(recall_net.output, recalled_gate.input)
+                # inhibit_net(
+                    # self.ctrl.output_serial_recall, recalled_gate, strength=6)
+                # nengo.Connection(recall_net.output, recalled_gate.input)
                 # nengo.Connection(recall_net.output, self.sim_th.input_a, transform=1.2)
                 # nengo.Connection(
                     # recall_net.output, self.last_item.input, transform=0.1,
