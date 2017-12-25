@@ -29,7 +29,8 @@ class IMemTrial(pytry.NengoTrial):
         self.proto = PROTOCOLS[p.protocol]
         self.stim_provider = StimulusProvider(self.proto, p.distractor_rate)
         self.vocabs = Vocabularies(
-            self.stim_provider, p.item_d, p.context_d, self.proto.n_items + 3)
+            self.stim_provider, p.item_d, p.context_d, self.proto.n_items + 3,
+            np.random.RandomState(p.seed + 1))
 
         with spa.Network(seed=p.seed) as model:
             model.imem = IMem(

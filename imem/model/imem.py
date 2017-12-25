@@ -112,9 +112,9 @@ class Vocabularies(FrozenObject):
 
         self.items = items
         if is_integer(contexts):
-            contexts = spa.Vocabulary(contexts)
+            contexts = spa.Vocabulary(contexts, rng=rng)
         self.contexts = contexts
-        self.positions = spa.Vocabulary(self.items.dimensions)
+        self.positions = spa.Vocabulary(self.items.dimensions, rng=rng)
 
         self.items.populate(';'.join(stim_provider.get_all_items()))
         if stim_provider.n_distractors_per_epoch > 0:
