@@ -13,7 +13,13 @@ n_trials = 100
 seeds = range(100)
 
 
-pspace = Param(seed=seeds, trial=range(n_trials))
+pspace = Param(
+    seed=seeds,
+    trial=range(n_trials),
+    ordinal_prob=0.0,
+    noise=0.015,
+    min_evidence=0.0325,
+    backend=['nengo:Simulator(seed=23)'] * n_trials)
 min_items = 1
 pool_size = 1
 max_jobs = 100
@@ -25,7 +31,7 @@ if platform.node().startswith('gra') or platform.node().startswith('cedar'):
         if 'split' in name or 'merge' in name:
             return '0-00:10'
         else:
-            return '0-04:30'
+            return '0-05:30'
     def memory_per_cpu(name):
         if 'split' in name:
             return '300M'
