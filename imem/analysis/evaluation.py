@@ -75,9 +75,9 @@ def evaluate_successful_recalls(proto, exp_data, model_data, ax=None):
         ax = plt.gca()
 
     plot_successful_recalls(
-        exp_data, proto.n_items, color=next(cp), label="experimental", ax=ax)
-    plot_successful_recalls(
         model_data, proto.n_items, color=next(cp), label="model", ax=ax)
+    plot_successful_recalls(
+        exp_data, proto.n_items, color=next(cp), label="experimental", ax=ax)
 
     ax.set_xlim(-0.5, proto.n_items + 0.5)
     ax.set_xlabel("# successful recalls")
@@ -88,22 +88,22 @@ def evaluate_successful_recalls(proto, exp_data, model_data, ax=None):
 def evaluate_successful_recall_dist(proto, exp_data, model_data, ax=None):
     ev_exp_data = convert(exp_data, 'success_count')
     ev_model_data = convert(model_data, 'success_count')
-    plot_dist_stats(ev_exp_data.data, ax)
     plot_dist_stats(ev_model_data.data, ax)
+    plot_dist_stats(ev_exp_data.data, ax)
 
 
 def evaluate_p_first_recall(proto, exp_data, model_data, ax=None):
     if ax is None:
         ax = plt.gca()
 
-    ev_exp_data = analysis.p_first_recall(exp_data)
-    ev_exp_data['p_first'].plot(
-        marker='o', label="experimental", ax=ax,
-        yerr=ev_exp_data[['ci_low', 'ci_upp']].values.T)
     ev_model_data = analysis.p_first_recall(model_data)
     ev_model_data['p_first'].plot(
         marker='o', label="model", ax=ax,
         yerr=ev_model_data[['ci_low', 'ci_upp']].values.T)
+    ev_exp_data = analysis.p_first_recall(exp_data)
+    ev_exp_data['p_first'].plot(
+        marker='s', label="experimental", ax=ax,
+        yerr=ev_exp_data[['ci_low', 'ci_upp']].values.T)
 
     ax.set_xlabel("Serial position")
     ax.set_ylabel("Probability of first recall")
@@ -121,17 +121,18 @@ def evaluate_crp(proto, exp_data, model_data, ax=None, limit=6):
         warnings.filterwarnings(
             'ignore', '.*converting a masked element to nan.*')
 
-        ev_exp_data = analysis.crp(exp_data)
-        ev_exp_data['crp'].plot(
-            marker='o', label="experimental", ax=ax,
-            yerr=np.copy(ev_exp_data[['ci_low', 'ci_upp']].values.T))
-
         ev_model_data = analysis.crp(model_data)
         ev_model_data['crp'].plot(
             marker='o', label="model", ax=ax,
             yerr=np.copy(ev_model_data[['ci_low', 'ci_upp']].values.T))
 
+        ev_exp_data = analysis.crp(exp_data)
+        ev_exp_data['crp'].plot(
+            marker='s', label="experimental", ax=ax,
+            yerr=np.copy(ev_exp_data[['ci_low', 'ci_upp']].values.T))
+
     ax.set_xlim(-limit, limit)
+    ax.set_ylim(bottom=0.)
     ax.set_xlabel("Lag position")
     ax.set_ylabel("CRP")
     ax.legend()
@@ -142,19 +143,19 @@ def evaluate_serial_pos_curve(
     if ax is None:
         ax = plt.gca()
 
-    ev_exp_data = analysis.serial_pos_curve(exp_data, strict=strict)
-    ev_exp_data['correct'].plot(
-        marker='o', label="experimental", ax=ax,
-        yerr=ev_exp_data[['ci_low', 'ci_upp']].values.T)
     ev_model_data = analysis.serial_pos_curve(model_data, strict=strict)
     ev_model_data['correct'].plot(
         marker='o', label="model", ax=ax,
         yerr=ev_model_data[['ci_low', 'ci_upp']].values.T)
+    ev_exp_data = analysis.serial_pos_curve(exp_data, strict=strict)
+    ev_exp_data['correct'].plot(
+        marker='s', label="experimental", ax=ax,
+        yerr=ev_exp_data[['ci_low', 'ci_upp']].values.T)
 
     ax.set_xlabel("Serial position")
     ax.set_ylabel("Proportion correct recalls")
     ax.set_ylim(0, 1)
-    ax.legend()
+    ax.legend(loc='best')
 
 
 def evaluate_transpositions(proto, exp_data, model_data, ax=None):
@@ -167,7 +168,10 @@ def evaluate_transpositions(proto, exp_data, model_data, ax=None):
         width=1., color=sns.color_palette()[0],
         yerr=data[['ci_low', 'ci_upp']].values.T)
     lim = np.max(np.abs(data.index.values))
-    ax.set_xlim(-lim, lim)
+    ax.set_xlim(-lim - .5, lim + .5)
+
+    ax.set_xlabel("Transposition")
+    ax.set_ylabel("Response proportion")
 
 
 def plot_successful_recalls(
