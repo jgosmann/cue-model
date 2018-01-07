@@ -16,7 +16,7 @@ class IMemTrial(pytry.NengoTrial):
         self.param("item dimensionality", item_d=256)
         self.param("context dimensionality", context_d=256)
         self.param("contextual drift rate", beta=0.62676)
-        self.param("distractor rate", distractor_rate=.5)
+        self.param("distractor rate", distractor_rate=.4)
         self.param("OSE memory decay", gamma=0.9775)
         self.param("OSE memory threshold", ose_thr=0.1)
         self.param("TCM prob. to recall from beginning", ordinal_prob=.1)

@@ -13,7 +13,7 @@ n_trials = 100
 seeds = range(100)
 
 
-pspace = Param(seed=seeds, trial=range(n_trials))
+pspace = Param(seed=seeds, trial=range(n_trials), min_evidence=0.04)
 min_items = 1
 pool_size = 1
 max_jobs = 100
