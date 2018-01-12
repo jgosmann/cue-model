@@ -4,6 +4,7 @@ import traceback
 import warnings
 
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 import numpy as np
 from psyrun.store import AutodetectStore
 from scipy.stats import kurtosis
@@ -23,7 +24,10 @@ def evaluate(path):
         try:
             proto_path = os.path.join(path, proto_name)
             if os.path.exists(proto_path):
-                exp_data = read_exp_data(proto.exp_data)
+                if proto.exp_data is None:
+                    exp_data = None
+                else:
+                    exp_data = read_exp_data(proto.exp_data)
                 model_data = DataRep(
                     'psyrun', store.load(locate_results_file(proto_path)))
 
@@ -76,20 +80,24 @@ def evaluate_successful_recalls(proto, exp_data, model_data, ax=None):
 
     plot_successful_recalls(
         model_data, proto.n_items, color=next(cp), label="model", ax=ax)
-    plot_successful_recalls(
-        exp_data, proto.n_items, color=next(cp), label="experimental", ax=ax)
+    if exp_data is not None:
+        plot_successful_recalls(
+            exp_data, proto.n_items, color=next(cp), label="experimental",
+            ax=ax)
 
     ax.set_xlim(-0.5, proto.n_items + 0.5)
     ax.set_xlabel("# successful recalls")
     ax.set_ylabel("Proportion")
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     ax.legend()
 
 
 def evaluate_successful_recall_dist(proto, exp_data, model_data, ax=None):
-    ev_exp_data = convert(exp_data, 'success_count')
     ev_model_data = convert(model_data, 'success_count')
     plot_dist_stats(ev_model_data.data, ax)
-    plot_dist_stats(ev_exp_data.data, ax)
+    if exp_data is not None:
+        ev_exp_data = convert(exp_data, 'success_count')
+        plot_dist_stats(ev_exp_data.data, ax)
 
 
 def evaluate_p_first_recall(proto, exp_data, model_data, ax=None):
@@ -100,13 +108,15 @@ def evaluate_p_first_recall(proto, exp_data, model_data, ax=None):
     ev_model_data['p_first'].plot(
         marker='o', label="model", ax=ax,
         yerr=ev_model_data[['ci_low', 'ci_upp']].values.T)
-    ev_exp_data = analysis.p_first_recall(exp_data)
-    ev_exp_data['p_first'].plot(
-        marker='s', label="experimental", ax=ax,
-        yerr=ev_exp_data[['ci_low', 'ci_upp']].values.T)
+    if exp_data is not None:
+        ev_exp_data = analysis.p_first_recall(exp_data)
+        ev_exp_data['p_first'].plot(
+            marker='s', label="experimental", ax=ax,
+            yerr=ev_exp_data[['ci_low', 'ci_upp']].values.T)
 
     ax.set_xlabel("Serial position")
-    ax.set_ylabel("Probability of first recall")
+    ax.set_ylabel("P(first recall)")
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     ax.legend()
     ax.set_ylim(bottom=0.)
 
@@ -126,10 +136,11 @@ def evaluate_crp(proto, exp_data, model_data, ax=None, limit=6):
             marker='o', label="model", ax=ax,
             yerr=np.copy(ev_model_data[['ci_low', 'ci_upp']].values.T))
 
-        ev_exp_data = analysis.crp(exp_data)
-        ev_exp_data['crp'].plot(
-            marker='s', label="experimental", ax=ax,
-            yerr=np.copy(ev_exp_data[['ci_low', 'ci_upp']].values.T))
+        if exp_data is not None:
+            ev_exp_data = analysis.crp(exp_data)
+            ev_exp_data['crp'].plot(
+                marker='s', label="experimental", ax=ax,
+                yerr=np.copy(ev_exp_data[['ci_low', 'ci_upp']].values.T))
 
     ax.set_xlim(-limit, limit)
     ax.set_ylim(bottom=0.)
@@ -147,14 +158,16 @@ def evaluate_serial_pos_curve(
     ev_model_data['correct'].plot(
         marker='o', label="model", ax=ax,
         yerr=ev_model_data[['ci_low', 'ci_upp']].values.T)
-    ev_exp_data = analysis.serial_pos_curve(exp_data, strict=strict)
-    ev_exp_data['correct'].plot(
-        marker='s', label="experimental", ax=ax,
-        yerr=ev_exp_data[['ci_low', 'ci_upp']].values.T)
+    if exp_data is not None:
+        ev_exp_data = analysis.serial_pos_curve(exp_data, strict=strict)
+        ev_exp_data['correct'].plot(
+            marker='s', label="experimental", ax=ax,
+            yerr=ev_exp_data[['ci_low', 'ci_upp']].values.T)
 
     ax.set_xlabel("Serial position")
-    ax.set_ylabel("Proportion correct recalls")
+    ax.set_ylabel("Recall proportion")
     ax.set_ylim(0, 1)
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     ax.legend(loc='best')
 
 
