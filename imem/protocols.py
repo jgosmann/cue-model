@@ -112,6 +112,67 @@ class StimulusProvider(object):
         return (self.get_item(i) for i in range(self.proto.n_items))
 
 
+class HebbRepStimulusProvider(object):
+    def __init__(
+            self, n_total_items, n_items_per_list, n_lists, rep_list_freq, pi,
+            recall_duration):
+        self.n_total_items = n_total_items
+        self.n_items_per_list = n_items_per_list
+        self.n_lists = n_lists
+        self.pi = pi
+        self.recall_duration = recall_duration
+
+        self.serial = True
+        self.n_distractors_per_epoch = 0
+
+        self.repeated_list = self.make_list()
+        self.lists = [
+            self.repeated_list if i % rep_list_freq == 0 else self.make_list()
+            for i in range(self.n_lists)]
+
+    def make_list(self):
+        return np.random.choice(
+            np.arange(self.n_total_items), self.n_items_per_list,
+            replace=False)
+
+    def get_all_items(self):
+        return ['V' + str(i) for i in range(self.proto.n_total_items)]
+
+    @property
+    def pres_phase_duration(self):
+        return self.n_items_per_list * self.pi
+
+    @property
+    def epoch_duration(self):
+        return self.pres_phase_duration + self.recall_duration
+
+    @property
+    def total_duration(self):
+        return self.epoch_duration * self.n_lists
+
+    @property
+    def proto(self):
+        return self
+
+    def epoch(self, t):
+        return int(t // self.epoch_duration)
+
+    def is_pres_phase(self, t):
+        return t % self.epoch_duration < self.pres_phase_duration
+
+    def is_recall_phase(self, t):
+        return not self.is_pres_phase(t)
+
+    def make_stimulus_fn(self):
+        def stimulus_fn(t):
+            if self.is_pres_phase(t):
+                return 'V' + str(
+                    self.lists[self.epoch(t)][
+                        int((t % self.epoch_duration) // self.pi)])
+            return '0'
+        return stimulus_fn
+
+
 def _datapath(path):
     return os.path.join(
         os.path.dirname(__file__), '../data/experimental', path)
