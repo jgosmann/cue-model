@@ -5,6 +5,7 @@ import nengo_spa as spa
 import numpy as np
 import pytry
 
+from imem.analysis.neural import model_out_to_responses
 from imem.model import IMem, Vocabularies
 from imem.protocols import HebbRepStimulusProvider
 
@@ -57,48 +58,30 @@ class IMemTrial(pytry.NengoTrial):
         return model
 
     def evaluate(self, p, sim, plt):
-        # sim.run(self.proto.total_duration)
-        sim.run(60.)
+        sim.run(self.stim_provider.total_duration)
 
-        # recall_vocab = self.vocabs.items.create_subset(self.stim_provider.get_all_items())
-        # similarity = spa.similarity(sim.data[self.p_recalls], recall_vocab)
-        # responses = []
-        # positions = np.arange(self.proto.n_items)
-        # last_recall = -1
-        # if self.proto.serial:
-            # for i in positions:
-                # recall_phase = sim.trange() > self.proto.pres_phase_duration
-                # s = recall_phase & (sim.data[self.p_pos][:, i] > 0.8)
-                # if np.any(s):
-                    # recall_for_pos = similarity[s][-1, :]
-                # else:
-                    # recall_for_pos = np.array([0.])
-                # if np.any(recall_for_pos > 0.6):
-                    # recalled = float(np.argmax(recall_for_pos))
-                    # if len(responses) == 0 or recalled != last_recall:
-                        # responses.append(recalled)
-                        # last_recall = recalled
-                    # else:
-                        # responses.append(np.nan)
-                # else:
-                    # responses.append(np.nan)
-        # else:
-            # above_threshold = similarity[np.max(similarity, axis=1) > 0.8, :]
-            # for x in np.argmax(above_threshold, axis=1):
-                # if x not in responses:
-                    # responses.append(float(x))
-        # responses = responses + (self.proto.n_items - len(responses)) * [np.nan]
+        t = sim.trange()
+
+        recall_vocab = self.vocabs.items.create_subset(self.stim_provider.get_all_items())
+        responses = []
+        for i in range(len(self.stim_provider.lists)):
+            start = i * self.stim_provider.total_duration
+            end = (i + 1) * self.stim_provider.total_duration
+            sel = (start < t) & (t <= end)
+            responses.append(model_out_to_responses(
+                recall_vocab, t[sel] - start, sim.data[self.p_recalls][sel],
+                sim.data[self.p_pos][sel], self.stim_provider))
+
 
         result = {
-            # 'responses': responses,
+            'responses': responses,
             'pos': sim.data[self.p_pos],
             'recalls': sim.data[self.p_recalls],
-            # 'positions': positions,
             'vocab_vectors': self.vocabs.items.vectors,
             'vocab_keys': list(self.vocabs.items.keys()),
             'pos_vectors': self.vocabs.positions.vectors,
             'pos_keys': list(self.vocabs.positions.keys()),
-            'lists': self.proto.lists,
+            'lists': self.stim_provider.lists,
         }
         if p.debug:
             result.update(
