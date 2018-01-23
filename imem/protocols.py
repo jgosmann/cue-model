@@ -130,6 +130,10 @@ class HebbRepStimulusProvider(object):
             self.repeated_list if i % rep_list_freq == 0 else self.make_list()
             for i in range(self.n_lists)]
 
+    @property
+    def n_items(self):
+        return self.n_items_per_list
+
     def make_list(self):
         return np.random.choice(
             np.arange(self.n_total_items), self.n_items_per_list,
@@ -166,9 +170,11 @@ class HebbRepStimulusProvider(object):
     def make_stimulus_fn(self):
         def stimulus_fn(t):
             if self.is_pres_phase(t):
-                return 'V' + str(
-                    self.lists[self.epoch(t)][
-                        int((t % self.epoch_duration) // self.pi)])
+                i = min(len(self.lists) - 1, self.epoch(t))
+                j = min(
+                    self.n_items_per_list - 1,
+                    int((t % self.epoch_duration) // self.pi))
+                return 'V' + str(self.lists[i][j])
             return '0'
         return stimulus_fn
 
